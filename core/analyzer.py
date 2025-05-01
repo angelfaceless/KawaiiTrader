@@ -35,13 +35,15 @@ def run_analysis(symbol: str, timeframe: str = "1h") -> str:
     report.append(manipulation["message"])
 
     # 🟪 IRZ Fib Projection
-    if manipulation["manipulated"]:
+    if manipulation["manipulated"] and manipulation["returned_to_range"]:
         fib = calculate_irz_projection(
             range_low=range_info["range_low"],
             range_high=range_info["range_high"],
             manipulation_direction=manipulation["direction"]
         )
         report.append(fib["message"])
+    elif manipulation["manipulated"]:
+        report.append("🟪 Manipulation occurred but price has NOT returned to range — no IRZ projected.")
     else:
         report.append("🟪 No manipulation = no IRZ projected.")
 

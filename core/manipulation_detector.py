@@ -1,58 +1,68 @@
-# kawaiitrader/core/manipulation_detector.py
+# core/manipulation_detector.py
 
 import pandas as pd
 
-def detect_manipulation(df: pd.DataFrame, range_low: float, range_high: float) -> dict:
+
+def detect_manipulation(df: pd.DataFrame, range_info: dict) -> dict:
     """
-    Detects if price has wicked outside the range and closed back inside.
-
-    Args:
-        df (pd.DataFrame): OHLCV data.
-        range_low (float): Lower body range bound.
-        range_high (float): Upper body range bound.
-
-    Returns:
-        dict with keys:
-            - 'manipulated': bool
-            - 'direction': 'up' | 'down' | None
-            - 'message': str
-            - 'returned_to_range': bool
+    Detects if price wicked above/below a range and returned inside it.
+    Works with real-time or historical data. Tracks status:
+    - 'manipulated': broke and returned ✅
+    - 'awaiting_return': broke, still outside ⏳
+    - 'clean': no breakout ⬜
     """
-    last_candle = df.iloc[-1]
 
-    high = last_candle["high"]
-    low = last_candle["low"]
-    close = last_candle["close"]
+    range_low = range_info["range_low"]
+    range_high = range_info["range_high"]
+    window = range_info.get("window", 50)  # how many bars formed the range
 
-    # Upside manipulation
-    if high > range_high:
-        returned = close <= range_high
-        return {
-            "manipulated": True,
-            "direction": "up",
-            "returned_to_range": returned,
-            "message": (
-                f"🟨 Manipulation Detected: Price wicked above {range_high} "
-                f"and {'returned' if returned else 'did NOT return'} inside range."
-            )
-        }
+    # Only look at candles that came after the consolidation
+    post_range_df = df.iloc[-(len(df) - window):]
 
-    # Downside manipulation
-    if low < range_low:
-        returned = close >= range_low
-        return {
-            "manipulated": True,
-            "direction": "down",
-            "returned_to_range": returned,
-            "message": (
-                f"🟨 Manipulation Detected: Price wicked below {range_low} "
-                f"and {'returned' if returned else 'did NOT return'} inside range."
-            )
-        }
+    direction = None
+    breakout_idx = None
+    returned_to_range = False
+    manipulated = False
+
+    # Step 1: Did we break above or below?
+    for i, row in post_range_df.iterrows():
+        if row["high"] > range_high:
+            direction = "up"
+            breakout_idx = i
+            break
+        elif row["low"] < range_low:
+            direction = "down"
+            breakout_idx = i
+            break
+
+    # Step 2: After breakout, did we return?
+    if direction and breakout_idx is not None:
+        subsequent = post_range_df.loc[breakout_idx:]
+        for _, row in subsequent.iterrows():
+            if range_low <= row["close"] <= range_high:
+                returned_to_range = True
+                manipulated = True
+                break
+
+    # Final result
+    if manipulated:
+        status = "manipulated"
+        msg = (
+            f"🟨 Manipulation detected — price broke {direction} and returned into the range."
+        )
+    elif direction:
+        status = "awaiting_return"
+        msg = (
+            f"🟧 Breakout detected {direction} but price has NOT returned into the range yet."
+        )
+    else:
+        status = "clean"
+        msg = "No manipulation detected."
 
     return {
-        "manipulated": False,
-        "direction": None,
-        "returned_to_range": False,
-        "message": "No manipulation detected."
+        "manipulated": manipulated,
+        "returned_to_range": returned_to_range,
+        "direction": direction,
+        "status": status,
+        "message": msg
     }

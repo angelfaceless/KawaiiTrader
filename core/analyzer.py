@@ -1,4 +1,4 @@
-# kawaiitrader/core/analyzer.py
+# core/analyzer.py
 
 from data.databento_client import fetch_ohlcv
 from core.support_resistance import detect_support_resistance
@@ -6,6 +6,7 @@ from core.trendline_detector import detect_trendline
 from core.range_detector import detect_body_range
 from core.manipulation_detector import detect_manipulation
 from core.irz_fib import calculate_irz_projection
+
 
 def run_analysis(symbol: str, timeframe: str = "1h") -> str:
     print(f"[Analyzer] Fetching data for {symbol} on {timeframe}")
@@ -26,25 +27,27 @@ def run_analysis(symbol: str, timeframe: str = "1h") -> str:
     trendline_msgs = detect_trendline(df, timeframe)
     report.extend(trendline_msgs)
 
-    # 🟥 Range Detection (Body-based)
+    # 🟥 Range Detection
     range_info = detect_body_range(df, timeframe)
     report.append(f"\n🟥 {range_info['message']}")
 
     # 🟨 Manipulation Detection
-    manipulation = detect_manipulation(df, range_info["range_low"], range_info["range_high"])
-    report.append(manipulation["message"])
+    if range_info.get("is_range", False):
+        manipulation = detect_manipulation(df, range_info)
+        report.append(manipulation["message"])
 
-    # 🟪 IRZ Fib Projection
-    if manipulation["manipulated"] and manipulation["returned_to_range"]:
-        fib = calculate_irz_projection(
-            range_low=range_info["range_low"],
-            range_high=range_info["range_high"],
-            manipulation_direction=manipulation["direction"]
-        )
-        report.append(fib["message"])
-    elif manipulation["manipulated"]:
-        report.append("🟪 Manipulation occurred but price has NOT returned to range — no IRZ projected.")
+        # 🟪 IRZ Fib Projection
+        if manipulation["status"] == "manipulated":
+            fib = calculate_irz_projection(
+                range_low=range_info["range_low"],
+                range_high=range_info["range_high"],
+                manipulation_direction=manipulation["direction"]
+            )
+            report.append(fib["message"])
+        else:
+            report.append("🟪 No IRZ projected — waiting for return into range.")
     else:
+        report.append("🟨 No valid range = manipulation detection skipped.")
         report.append("🟪 No manipulation = no IRZ projected.")
 
     return "\n".join(report)

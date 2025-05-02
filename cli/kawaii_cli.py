@@ -1,25 +1,24 @@
-# kawaiitrader/cli/kawaii_cli.py
+# cli/kawaii_cli.py
 
-import argparse
-from dotenv import load_dotenv
+import sys
 from core.analyzer import run_analysis
+from utils.symbols import resolve_symbol_alias
 
-load_dotenv()
 
-def main():
-    parser = argparse.ArgumentParser(description="Run kawaiitrader reporting bot.")
-    parser.add_argument("symbols", nargs="*", help="Asset symbols like ES, NQ, BTC")
-    parser.add_argument("--tf", "--timeframe", dest="timeframe", default="1h", help="Timeframe (e.g., 15m, 1h)")
+def main(symbol=None, timeframe="15min"):
+    # Allow command-line fallback if not passed in
+    if symbol is None:
+        if len(sys.argv) < 2:
+            print("Usage: python main.py <SYMBOL> [TIMEFRAME]")
+            sys.exit(1)
+        symbol = sys.argv[1]
+        timeframe = sys.argv[2] if len(sys.argv) > 2 else "15min"
 
-    args = parser.parse_args()
-    symbols = args.symbols or ["ES"]
+    mapped_symbol = resolve_symbol_alias(symbol)
+    print(f"[KawaiiTrader] Running report for: ['{symbol}', '{timeframe}'] @ {timeframe}")
 
-    print(f"[KawaiiTrader] Running report for: {symbols} @ {args.timeframe}")
-
-    for symbol in symbols:
-        print(f" - Generating report for {symbol} on {args.timeframe}")
-        try:
-            report = run_analysis(symbol, args.timeframe)
-            print("\n" + report + "\n")
-        except Exception as e:
-            print(f"[ERROR] Failed to generate report for {symbol}: {e}")
+    try:
+        result = run_analysis(mapped_symbol, timeframe)
+        print(result)
+    except Exception as e:
+        print(f"[ERROR] Failed to analyze {mapped_symbol} on {timeframe}: {e}")

@@ -1,39 +1,93 @@
-# kawaiitrader/core/range_detector.py
+# core/range_detector.py
 
 import pandas as pd
+import numpy as np
 
-def detect_body_range(df: pd.DataFrame, timeframe: str = "1h"):
+
+def detect_consolidation_hybrid(
+    df: pd.DataFrame,
+    window: int = 50,
+    atr_multiplier: float = 1.25,
+    tolerance_pct: float = 0.015,
+    min_bounces: int = 1  # ✅ now requires just 1 wick touch per side
+) -> dict:
     """
-    Detects the current price range using candle bodies (open/close only).
-    
-    Args:
-        df (pd.DataFrame): OHLCV data.
-        timeframe (str): '15m', '1h', '4h', etc.
-
-    Returns:
-        dict with range_high, range_low, and a description string
+    Hybrid consolidation detection:
+    - ATR-based compression
+    - Wick bounce logic (highs/lows)
+    - Passes if either condition is met
     """
-    tf_window_map = {
-        "15m": 96,     # ~1 day
-        "30m": 48,
-        "1h": 50,
-        "4h": 30,
-        "1d": 15
-    }
+    if df is None or df.empty or len(df) < window:
+        return {
+            "range_low": np.nan,
+            "range_high": np.nan,
+            "message": f"Not enough data to detect consolidation (requires {window} candles).",
+            "is_range": False
+        }
 
-    window = tf_window_map.get(timeframe, 50)
+    recent = df[-window:]
+    high = recent["high"]
+    low = recent["low"]
+    close = recent["close"]
 
-    if len(df) < window:
-        raise ValueError(f"Not enough data for {window}-bar range detection.")
+    # ATR
+    tr = pd.concat([
+        high - low,
+        (high - close.shift()).abs(),
+        (low - close.shift()).abs()
+    ], axis=1).max(axis=1)
+    atr = tr.rolling(window).mean().iloc[-1]
 
-    body_highs = df[['open', 'close']].max(axis=1)
-    body_lows = df[['open', 'close']].min(axis=1)
+    range_high = high.max()
+    range_low = low.min()
+    range_width = range_high - range_low
+    tolerance = range_width * tolerance_pct
 
-    recent_high = round(body_highs[-window:].max(), 2)
-    recent_low = round(body_lows[-window:].min(), 2)
+    # Wick-based touch logic
+    low_touches = ((recent["low"] - range_low).abs() <= tolerance).sum()
+    high_touches = ((recent["high"] - range_high).abs() <= tolerance).sum()
+
+    is_tight = range_width < atr * atr_multiplier
+    is_bouncing = low_touches >= min_bounces and high_touches >= min_bounces
+    is_range = is_tight or is_bouncing
+
+    # Debug print
+    print("----- [Range Debug] -----")
+    print(f"ATR: {atr:.2f}")
+    print(f"Range: {range_low:.2f} – {range_high:.2f} (width: {range_width:.2f})")
+    print(f"Touch tolerance: ±{tolerance:.2f}")
+    print(f"Low touches (wick): {low_touches} | High touches (wick): {high_touches}")
+    print(f"ATR filter passed: {is_tight} | Bounce filter passed: {is_bouncing}")
+    print(f"Final decision: {'✅ Consolidation' if is_range else '❌ No range'}")
+    print("--------------------------")
+
+    if is_range:
+        msg = (
+            f"Consolidation zone detected from {range_low:.2f} to {range_high:.2f} "
+            f"({low_touches} low wicks, {high_touches} high wicks, ATR={atr:.2f})."
+        )
+    else:
+        msg = "No consolidation zone detected recently."
 
     return {
-        "range_high": recent_high,
-        "range_low": recent_low,
-        "message": f"Range (body-only) over last {window} bars: {recent_low} – {recent_high}"
+        "range_low": float(range_low),
+        "range_high": float(range_high),
+        "low_touches": int(low_touches),
+        "high_touches": int(high_touches),
+        "message": msg,
+        "is_range": is_range
     }
+
+
+def detect_body_range(df: pd.DataFrame, timeframe: str) -> dict:
+    """
+    Entry point used by analyzer.py.
+    """
+    print(f"[DEBUG] Running hybrid range detection on {len(df)} candles for {timeframe}")
+    return detect_consolidation_hybrid(
+        df,
+        window=50,
+        atr_multiplier=1.25,
+        tolerance_pct=0.015,
+        min_bounces=1  # ✅ Final tuned value
+    )

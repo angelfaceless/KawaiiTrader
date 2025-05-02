@@ -9,8 +9,8 @@ def resolve_symbol_alias(symbol: str) -> str:
         "NQ": "NQ.c.0",
         "RTY": "RTY.c.0",
         "YM": "YM.c.0",
-        "BTC": "CME.BTC/USD",
-        "ETH": "CME.ETH/USD",
-    }
-
+        "BTC": "BTC.c.0",
+        "ETH": "ETH.c.0",
+        "MES": "MES.c.0",
+        "MNQ": "MNQ.c.0",}
     return symbol_map.get(symbol.upper(), symbol)

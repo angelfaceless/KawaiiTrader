@@ -1,51 +1,44 @@
-# kawaiitrader/core/irz_fib.py
-
-def calculate_irz_projection(range_low: float, range_high: float, manipulation_direction: str) -> dict:
+def calculate_irz_projection(range_low, range_high, manipulation_direction, breakouts):
     """
-    Projects a non-standard fib retracement and target structure based on direction.
+    Custom IRZ and Fibonacci projection logic using fixed levels and manipulation direction.
+    Projects Fibs in the direction opposite to the manipulation, anchored to the range body.
 
     Args:
-        range_low (float): Bottom of the range (body-based).
-        range_high (float): Top of the range (body-based).
-        manipulation_direction (str): 'up' or 'down'
+        range_low (float): Lower bound of full-body range.
+        range_high (float): Upper bound of full-body range.
+        manipulation_direction (str): 'above' or 'below'.
+        breakouts (list): List of breakout timestamps (used elsewhere if needed).
 
     Returns:
-        dict with levels and formatted message.
+        dict: {
+            'levels': dict of level -> projected price,
+            'irz': [0.618, 0.707, 0.786],  # always same
+            'targets': [0, -0.236, -0.618, -1],  # always same
+            'direction': 'down' or 'up'
+        }
     """
-    levels = {
-        "1": None,
-        "0.786": None,
-        "0.707": None,
-        "0.618": None,
-        "0.5": None,
-        "0": None,
-        "-0.236": None,
-        "-0.618": None,
-        "-1": None
-    }
 
-    if manipulation_direction == "up":
+    fib_levels = [0, 0.618, 1, 0.707, 0.786, -0.236, 0.5, -0.618, -1]
+    irz_levels = [0.618, 0.707, 0.786]
+    target_levels = [0, -0.236, -0.618, -1]
+
+    if manipulation_direction == 'above':
         anchor_0 = range_low
         anchor_1 = range_high
-        direction = "projected downward"
-    elif manipulation_direction == "down":
+        direction = 'down'
+    elif manipulation_direction == 'below':
         anchor_0 = range_high
         anchor_1 = range_low
-        direction = "projected upward"
+        direction = 'up'
     else:
-        return {"message": "🟪 No manipulation, so no IRZ projected."}
+        raise ValueError("manipulation_direction must be 'above' or 'below'")
 
-    diff = anchor_1 - anchor_0
-
-    for key in levels.keys():
-        k = float(key)
-        levels[key] = round(anchor_0 + (diff * k), 2)
-
-    msg = [f"🟪 IRZ Levels ({direction}):"]
-    msg.append(f"Retrace Zone → {levels['0.618']} / {levels['0.707']} / {levels['0.786']}")
-    msg.append(f"Profit Targets → {levels['-0.236']} / {levels['-0.618']} / {levels['-1']}")
+    delta = anchor_1 - anchor_0
+    levels = {level: anchor_0 + delta * level for level in fib_levels}
 
     return {
-        "levels": levels,
-        "message": "\n".join(msg)
+        'levels': levels,
+        'irz': irz_levels,
+        'targets': target_levels,
+        'direction': direction
     }

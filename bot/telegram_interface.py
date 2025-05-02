@@ -1,65 +1,56 @@
-#!/usr/bin/env python3
-
 import os
-import logging
+import sys
+import asyncio
 from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from dotenv import load_dotenv
 
-# Import CLI logic for symbol mapping and reporting
-from main import map_to_continuous, run_single_report
+# 🔐 Reset any stale env keys
+os.environ.pop("DATABENTO_API_KEY", None)
+os.environ.pop("TELEGRAM_BOT_TOKEN", None)
 
-# Setup logging
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    level=logging.INFO,
-)
-logger = logging.getLogger(__name__)
+# 📂 Load .env from project root
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+dotenv_path = os.path.join(project_root, ".env")
+load_dotenv(dotenv_path, override=True)
 
-# Default timeframe if none provided
-DEFAULT_TF = "15min"
+# ✅ Confirm token and key load
+print(f"[DEBUG] Loaded TELEGRAM_TOKEN: {os.environ.get('TELEGRAM_BOT_TOKEN')}")
+print(f"[DEBUG] Loaded DATABENTO_API_KEY: {os.environ.get('DATABENTO_API_KEY')}")
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text("🌸 Welcome to KawaiiTrader! Use /report <symbol> [<timeframe>] 🌸")
+# 🔧 Add root to path for CLI access
+sys.path.append(project_root)
 
-async def report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+from cli.kawaii_cli import run_analysis
+
+
+async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args
     if not args:
-        await update.message.reply_text("⚠️ Usage: /report <symbol> [<timeframe>]")
+        await update.message.reply_text("Usage: /report SYMBOL [TIMEFRAME], e.g. /report ES 15m")
         return
 
-    raw_symbol = args[0].upper()
-    timeframe = args[1] if len(args) > 1 else DEFAULT_TF
+    symbol = args[0]
+    timeframe = args[1] if len(args) > 1 else "15m"
 
     try:
-        mapped_symbol = map_to_continuous(raw_symbol)
-        logger.info(f"[TelegramBot] Mapped {raw_symbol} to {mapped_symbol} with tf={timeframe}")
-        await update.message.reply_text(f"🌸 Generating report for {mapped_symbol} on {timeframe}... 🌸")
-
-        result = run_single_report(mapped_symbol, timeframe)
-
-        if result:
-            await update.message.reply_text(result)
-        else:
-            await update.message.reply_text(f"⚠️ No report generated for {mapped_symbol}.")
+        result = run_analysis(symbol, timeframe)
+        await update.message.reply_text(result, parse_mode='Markdown')
     except Exception as e:
-        logger.exception("[TelegramBot] Error in /report command")
-        await update.message.reply_text(f"⚠️ Error: {e}")
+        await update.message.reply_text(f"Error: {e}")
+
 
 def main():
-    print("🐞 DEBUG: main() is running...")
-
-    token = os.getenv("TELEGRAM_BOT_TOKEN")
+    token = os.environ.get("TELEGRAM_BOT_TOKEN")
     if not token:
-        print("⚠️ TELEGRAM_BOT_TOKEN environment variable not set.")
-        return
+        raise ValueError("TELEGRAM_BOT_TOKEN not found in environment")
 
-    application = Application.builder().token(token).build()
+    app = ApplicationBuilder().token(token).build()
+    app.add_handler(CommandHandler("report", report))
 
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("report", report))
+    print("Telegram bot is running...")
+    app.run_polling()
 
-    print("🌸 [TelegramBot] KawaiiTrader Bot is running and polling Telegram... 🌸")
-    application.run_polling()
 
 if __name__ == "__main__":
     main()

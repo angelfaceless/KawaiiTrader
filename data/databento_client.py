@@ -8,7 +8,6 @@ from databento import Historical
 from dotenv import load_dotenv
 
 load_dotenv()
-API_KEY = os.getenv("DATABENTO_API_KEY")
 
 TIMEFRAME_SECONDS = {
     "1min": 60,
@@ -53,7 +52,9 @@ def fetch_ohlcv(symbol: str, timeframe: str = "15min", lookback_days: int = None
 
         print(f"[Data] Fetching {symbol} from {start_time} to {end_time} on {timeframe} timeframe...")
 
-        client = Historical(key=API_KEY)
+        # ✅ NEW: Load API key here to avoid issues with subprocesses
+        api_key = os.getenv("DATABENTO_API_KEY")
+        client = Historical(key=api_key)
 
         # Try ohlcv_1s first
         try:

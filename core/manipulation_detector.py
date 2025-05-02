@@ -1,68 +1,59 @@
-# core/manipulation_detector.py
-
 import pandas as pd
+import numpy as np
+from core.range_detector import detect_body_range as detect_range
 
+def detect_manipulation(df: pd.DataFrame, timeframe: str = "15m", lookback: int = 20, lookahead: int = 30, momentum_multiplier: float = 1.5):
+    df = df.copy()
+    df['body_size'] = abs(df['close'] - df['open'])
+    df['avg_body_size'] = df['body_size'].rolling(window=lookback).mean()
+    df['is_momentum'] = df['body_size'] > (df['avg_body_size'] * momentum_multiplier)
 
-def detect_manipulation(df: pd.DataFrame, range_info: dict) -> dict:
-    """
-    Detects if price wicked above/below a range and returned inside it.
-    Works with real-time or historical data. Tracks status:
-    - 'manipulated': broke and returned ✅
-    - 'awaiting_return': broke, still outside ⏳
-    - 'clean': no breakout ⬜
-    """
+    range_info = detect_range(df, timeframe)
 
-    range_low = range_info["range_low"]
-    range_high = range_info["range_high"]
-    window = range_info.get("window", 50)  # how many bars formed the range
+    if not isinstance(range_info, dict) or 'range_high' not in range_info or 'range_low' not in range_info:
+        raise ValueError("Expected range_info to be a dict with 'range_high' and 'range_low' keys.")
 
-    # Only look at candles that came after the consolidation
-    post_range_df = df.iloc[-(len(df) - window):]
+    current_range_high = range_info['range_high']
+    current_range_low = range_info['range_low']
 
-    direction = None
-    breakout_idx = None
-    returned_to_range = False
-    manipulated = False
+    manipulations = []
+    breakouts = []
 
-    # Step 1: Did we break above or below?
-    for i, row in post_range_df.iterrows():
-        if row["high"] > range_high:
-            direction = "up"
-            breakout_idx = i
-            break
-        elif row["low"] < range_low:
-            direction = "down"
-            breakout_idx = i
-            break
+    for i in range(1, len(df)):
+        candle = df.iloc[i]
+        timestamp = candle.name
+        close = candle['close']
+        open_ = candle['open']
+        is_momentum = candle['is_momentum']
+        body_high = max(open_, close)
+        body_low = min(open_, close)
 
-    # Step 2: After breakout, did we return?
-    if direction and breakout_idx is not None:
-        subsequent = post_range_df.loc[breakout_idx:]
-        for _, row in subsequent.iterrows():
-            if range_low <= row["close"] <= range_high:
-                returned_to_range = True
-                manipulated = True
-                break
+        if body_low > current_range_high and is_momentum:
+            breakouts.append({"timestamp": timestamp, "price": close, "direction": "bullish"})
+        elif body_high < current_range_low and is_momentum:
+            breakouts.append({"timestamp": timestamp, "price": close, "direction": "bearish"})
+        elif (body_high > current_range_high or body_low < current_range_low) and current_range_low <= close <= current_range_high:
+            direction = "bullish" if body_low < current_range_low else "bearish"
+            manipulations.append({"timestamp": timestamp, "price": close, "direction": direction})
 
-    # Final result
-    if manipulated:
-        status = "manipulated"
-        msg = (
-            f"🟨 Manipulation detected — price broke {direction} and returned into the range."
-        )
-    elif direction:
-        status = "awaiting_return"
-        msg = (
-            f"🟧 Breakout detected {direction} but price has NOT returned into the range yet."
-        )
+    msg = f"Detected {len(manipulations)} manipulations and {len(breakouts)} breakouts based on full-body momentum logic."
+    status = "manipulated" if len(manipulations) > 0 or len(breakouts) > 0 else "clean"
+
+    # ✅ Safe directional bias calculation using .get()
+    total_bullish = sum(1 for m in manipulations + breakouts if m.get('direction') == "bullish")
+    total_bearish = sum(1 for m in manipulations + breakouts if m.get('direction') == "bearish")
+
+    if total_bullish > total_bearish:
+        bias = "bullish"
+    elif total_bearish > total_bullish:
+        bias = "bearish"
     else:
-        status = "clean"
-        msg = "No manipulation detected."
+        bias = "neutral"
 
     return {
-        "manipulated": manipulated,
-        "returned_to_range": returned_to_range,
-        "direction": direction,
+        "manipulations": manipulations,
+        "breakouts": breakouts,
+        "message": msg,
         "status": status,
-        "message": msg
+        "bias": bias
     }

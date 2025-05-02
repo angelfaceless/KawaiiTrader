@@ -1,86 +1,72 @@
-# 🌸 KawaiiTrader — Market Structure & Manipulation Detection Bot
+🐣 KawaiiTrader v6
 
-KawaiiTrader is an automated futures market structure analysis engine that fetches continuous futures data from **Databento** and identifies support/resistance, trendlines, manipulation wicks, and IRZ retracement zones.
+KawaiiTrader is a lightweight market structure and manipulation detection engine designed for futures traders. This version integrates CLI and Telegram bot reporting, powered by historical data from Databento.
 
-It supports flexible timeframes (`15min`, `1h`, `3h`, etc.) and generates both CLI and **Telegram Bot** reports in beautiful Markdown.
+🚀 Features
 
----
+🔍 Price action range detection using body candles
+🟨 Manipulation detection based on full-body closes and momentum filters
+📐 IRZ Fibonacci projections with directional bias
+🔁 Fallback to raw trade data if OHLCV is unavailable
+🤖 Telegram bot interface: Get real-time reports from anywhere
+🧠 Symbol aliasing (e.g. ES → ES.c.0)
+🧼 Clean .env-based key loading, no hardcoded secrets
+📦 Installation
 
-## ✨ Features
-
-- 🔁 Continuous futures symbol support (e.g. `ES.c.0`)
-- ⏱ Dynamic timeframe support (`15min`, `1h`, `3h`, `6h`, `1d`)
-- 📉 Support and Resistance level detection
-- 📈 Trendline analysis with multi-window pivot scanning
-- 🟥 Manipulation wick detection and return-to-range logic
-- 📊 IRZ (Impulse Retrace Zones) Fibonacci-based projections
-- 💬 Telegram bot `/report SYMBOL TIMEFRAME` support
-- 🧠 Automatically adjusts for Databento historical data latency
-- 🕒 Dynamic candle lookback: fetches minimum 50 bars based on timeframe
-- 🪷 Beautiful CLI and Telegram output with Markdown formatting
-
----
-
-## ⚙️ Installation
-
-```bash
-git clone https://github.com/your-username/kawaiitrader.git
+git clone https://github.com/yourusername/kawaiitrader.git
 cd kawaiitrader
-
-# Create .env with your Databento key
-echo 'DATABENTO_API_KEY=db-xxxxxxx' > .env
-
-# Install dependencies
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
-🚀 CLI Usage
+🔐 .env Setup
 
-# Run analysis from terminal
+Create a .env file in the project root with your credentials:
+
+DATABENTO_API_KEY=your_db_key_here
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
+✅ Do NOT commit this file — it’s ignored via .gitignore.
+💻 CLI Usage
+
 python3 main.py ES 15min
-python3 main.py NQ 1h
-python3 main.py BTC 3h
-ES → auto-mapped to ES.c.0
-Default report format is printed in Markdown.
-💬 Telegram Bot Setup
+Default timeframe is 15min if not specified.
+💬 Telegram Bot
 
-Create a bot and get the token
-Set the token as an env variable:
-export TELEGRAM_BOT_TOKEN=your_token_here
-Run the bot:
-PYTHONPATH=$(pwd) python3 -m bot.telegram_interface
-Send commands in chat:
-/report ES 15min
-/report NQ 1h
-/report BTC 3h
-📝 Supports auto symbol mapping (e.g. ES → ES.c.0)
+Start the bot:
 
-📒 Limitations
+source .env
+python3 bot/telegram_interface.py
+Use in Telegram:
 
-Only symbols with Databento continuous mappings will work.
-Telegram bot uses polling — don’t run more than one instance.
-Historical data may have ~10 minute latency. Live alerts not implemented yet.
-Minimum of 50 candles required for valid analysis.
-📅 Planned
+/report ES 1h
+/report BTC
+📊 Report Contents
 
-Live data alert support via WebSocket + cron
-Web UI with trendline & range visualization
-TradingView webhook ingestion
-Multi-symbol scheduling via cron.yaml or Supabase tasks
-🔐 Security
+Support & Resistance levels
+Trendline detection
+Consolidation range detection
+Manipulation (fakeouts with return)
+Breakouts (no return)
+IRZ Fibonacci projection with bias and target levels
+⚠️ Considerations & Limitations
 
-Ensure .env is in your .gitignore. Never push your API keys or bot tokens publicly.
+🔁 Historical data only — no live streaming (by design)
+📉 Manipulation logic relies on full candle closes and ATR filters
+🔓 API keys must be valid and current in .env
+🔁 Telegram bot must be restarted to pick up new .env changes
+✅ Ensure only one instance of the bot is running to avoid
+Conflict: terminated by other getUpdates request
+🧪 Debug Tips
 
-📎 Example Output
+Add print() statements in analyzer.py to trace flow
+Use source .env before running CLI or bot
+Check .env changes by running:
+echo $DATABENTO_API_KEY
+📂 Version
 
-📊 KawaiiTrader Report for ES.c.0 (15min)
-========================================
-Fetched 184 candles from Databento
+v6 — Stable as of May 2025
 
-🟦 Support Levels: [...]
-🟥 Resistance Levels: [...]
-🟩 Support trendline detected (15min)
+🧠 License
 
-🟥 Range (body-only) over last 50 bars: 4450 – 4620
-🟨 Manipulation Detected: Price wicked above and returned inside range.
-🟪 IRZ Levels (projected downward):
-Retrace Zone → 4570 / 4585 / 4600
-Profit Targets → 4400 / 4340 / 4280
+MIT — use freely with attribution
+
+Let me know when you’re ready to commit this with your v6 Git snapshot.

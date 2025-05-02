@@ -1,13 +1,18 @@
 # databento_client.py
 
 import os
+os.environ.pop("DATABENTO_API_KEY", None)  # Clear any old exported key
+
+from dotenv import load_dotenv
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+dotenv_path = os.path.join(project_root, ".env")
+load_dotenv(dotenv_path, override=True)
+print("[DEBUG] DATABENTO_API_KEY:", os.getenv("DATABENTO_API_KEY"))
+
 import math
 import pandas as pd
 from datetime import datetime, timedelta, timezone
 from databento import Historical
-from dotenv import load_dotenv
-
-load_dotenv()
 
 TIMEFRAME_SECONDS = {
     "1min": 60,
@@ -52,7 +57,7 @@ def fetch_ohlcv(symbol: str, timeframe: str = "15min", lookback_days: int = None
 
         print(f"[Data] Fetching {symbol} from {start_time} to {end_time} on {timeframe} timeframe...")
 
-        # ✅ NEW: Load API key here to avoid issues with subprocesses
+        # ✅ Load API key at runtime (fresh from .env)
         api_key = os.getenv("DATABENTO_API_KEY")
         client = Historical(key=api_key)
 

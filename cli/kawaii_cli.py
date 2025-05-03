@@ -1,9 +1,7 @@
-# cli/kawaii_cli.py
-
 import sys
 from core.analyzer import run_analysis
 from utils.symbols import resolve_symbol_alias
-
+from formatters.markdown_formatter import format_report_markdown
 
 def main(symbol=None, timeframe="15min"):
     # Allow command-line fallback if not passed in
@@ -18,7 +16,14 @@ def main(symbol=None, timeframe="15min"):
     print(f"[KawaiiTrader] Running report for: ['{symbol}', '{timeframe}'] @ {timeframe}")
 
     try:
-        result = run_analysis(mapped_symbol, timeframe)
-        print(result)
+        report = run_analysis(mapped_symbol, timeframe)
+        print(format_report_markdown(report))  # 👈 This preserves your CLI output
     except Exception as e:
         print(f"[ERROR] Failed to analyze {mapped_symbol} on {timeframe}: {e}")
+
+
+# Reusable for Telegram and bots
+def run_cli_report(symbol: str, timeframe: str = "15min") -> str:
+    mapped_symbol = resolve_symbol_alias(symbol)
+    report = run_analysis(mapped_symbol, timeframe)
+    return format_report_markdown(report)

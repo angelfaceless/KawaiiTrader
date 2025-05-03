@@ -1,5 +1,3 @@
-# core/analyzer.py
-
 from data.databento_client import fetch_ohlcv
 from core.support_resistance import detect_support_resistance
 from core.trendline_detector import detect_trendline
@@ -7,59 +5,63 @@ from core.range_detector import detect_body_range
 from core.manipulation_detector import detect_manipulation
 from core.irz_fib import calculate_irz_projection
 from core.visualizer import plot_full_analysis
+from core.report_types import Report, Target, ManipulationEvent, Retracement
 
-
-def run_analysis(symbol: str, timeframe: str = "1h") -> str:
+def run_analysis(symbol: str, timeframe: str = "1h") -> Report:
     print(f"[Analyzer] Fetching data for {symbol} on {timeframe}")
     df = fetch_ohlcv(symbol, timeframe)
 
     if df is None or df.empty:
-        return f"[ERROR] No data returned for {symbol} on {timeframe}"
-
-    report = []
-
-    report.append(f"📊 KawaiiTrader Report for {symbol} ({timeframe})")
-    report.append("=" * 40)
-    report.append(f"Fetched {len(df)} candles from Databento")
+        raise ValueError(f"No data returned for {symbol} on {timeframe}")
 
     # 🟦 Support / Resistance
     supports, resistances = detect_support_resistance(df)
-    report.append(f"\n🟦 Support Levels: {supports}")
-    report.append(f"🟥 Resistance Levels: {resistances}")
 
-    # 🟩 Trendline Detection
+    # 📐 Trendlines
     trendline_data = detect_trendline(df, timeframe, symbol)
-    trendline_msgs = trendline_data["messages"]
     trendline_vectors = trendline_data["vectors"]
-    report.extend(trendline_msgs)
+    trendline_summary = "\n".join(trendline_data["messages"])
 
     # 🟥 Range Detection
     range_info = detect_body_range(df, timeframe)
-    report.append(f"\n🟥 {range_info['message']}")
+    range_low = range_info.get("range_low")
+    range_high = range_info.get("range_high")
+    directional_bias = range_info.get("bias", "neutral")
+
+    irz_zone = None
+    irz_message = None
+    targets = []
+    manipulations = []
+    retracements = []
 
     fib_data = None
-    manipulation = {"status": "clean", "message": "", "direction": None}
-
-    # 🟨 Manipulation Detection
     if range_info.get("is_range", False):
         manipulation = detect_manipulation(df, range_info)
-        report.append(manipulation["message"])
 
-        # 🟪 IRZ Fib Projection
         if manipulation["status"] == "manipulated":
             fib_data = calculate_irz_projection(
-                range_low=range_info["range_low"],
-                range_high=range_info["range_high"],
+                range_low=range_low,
+                range_high=range_high,
                 manipulation_direction=manipulation["direction"]
             )
-            report.append(fib_data["message"])
-        else:
-            report.append("🟪 No IRZ projected — waiting for return into range.")
-    else:
-        report.append("🟨 No valid range = manipulation detection skipped.")
-        report.append("🟪 No manipulation = no IRZ projected.")
 
-    # 🖼️ Generate Visual Chart
+            irz_zone = fib_data.get("irz_zone")
+            irz_message = fib_data.get("message")
+
+            for t in fib_data.get("targets", []):
+                targets.append(t)  # ✅ Already a Target instance
+
+            for r in fib_data.get("retracements", []):
+                retracements.append(r)  # ✅ Already a Retracement instance
+
+        if manipulation["status"] != "clean":
+            manipulations.append(ManipulationEvent(
+                direction=manipulation["direction"],
+                price=manipulation["price"],
+                timestamp=manipulation["timestamp"]
+            ))
+
+    # 🖼️ Chart output
     chart_path = plot_full_analysis(
         df=df,
         symbol=symbol,
@@ -71,6 +73,19 @@ def run_analysis(symbol: str, timeframe: str = "1h") -> str:
         range_data=range_info
     )
 
-    report.append(f"\n📈 Chart saved to: `{chart_path}`")
-
-    return "\n".join(report)
+    return Report(
+        symbol=symbol,
+        timeframe=timeframe,
+        range_low=range_low,
+        range_high=range_high,
+        directional_bias=directional_bias,
+        irz_zone=irz_zone,
+        irz_message=irz_message,
+        trendline_summary=trendline_summary,
+        support_levels=supports,
+        resistance_levels=resistances,
+        chart_path=chart_path,
+        targets=targets,
+        manipulations=manipulations,
+        retracements=retracements
+    )

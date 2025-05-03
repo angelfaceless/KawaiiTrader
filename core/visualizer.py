@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -65,7 +66,7 @@ def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels,
             height=range_high - range_low,
             linewidth=0,
             facecolor="purple",
-            alpha=0.08  # more transparent
+            alpha=0.08  # even more transparent
         )
         ax.add_patch(rect)
 
@@ -77,7 +78,9 @@ def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels,
     ax.grid(True)
     ax.set_xticks([])
 
-    chart_path = f"chart_{symbol}_{timeframe}.png"
+    # 💾 Save to Charts/
+    os.makedirs("Charts", exist_ok=True)
+    chart_path = os.path.join("Charts", f"chart_{symbol}_{timeframe}.png")
     plt.tight_layout()
     plt.savefig(chart_path)
     plt.close()

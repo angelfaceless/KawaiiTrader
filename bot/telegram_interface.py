@@ -1,65 +1,33 @@
-#!/usr/bin/env python3
+# bot/telegram_interface.py
 
 import os
-import logging
+from dotenv import load_dotenv
 from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from cli.kawaii_cli import run_cli_report
 
-# Import CLI logic for symbol mapping and reporting
-from main import map_to_continuous, run_single_report
+load_dotenv()
+BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
-# Setup logging
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    level=logging.INFO,
-)
-logger = logging.getLogger(__name__)
-
-# Default timeframe if none provided
-DEFAULT_TF = "15min"
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text("🌸 Welcome to KawaiiTrader! Use /report <symbol> [<timeframe>] 🌸")
-
-async def report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    args = context.args
-    if not args:
-        await update.message.reply_text("⚠️ Usage: /report <symbol> [<timeframe>]")
-        return
-
-    raw_symbol = args[0].upper()
-    timeframe = args[1] if len(args) > 1 else DEFAULT_TF
-
+async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        mapped_symbol = map_to_continuous(raw_symbol)
-        logger.info(f"[TelegramBot] Mapped {raw_symbol} to {mapped_symbol} with tf={timeframe}")
-        await update.message.reply_text(f"🌸 Generating report for {mapped_symbol} on {timeframe}... 🌸")
+        args = context.args
+        if not args:
+            await update.message.reply_text("Usage: /report SYMBOL[,SYMBOL2,...] [TIMEFRAME]")
+            return
+        
+        symbols = args[0].split(',')
+        timeframe = args[1] if len(args) > 1 else '15min'
 
-        result = run_single_report(mapped_symbol, timeframe)
+        for symbol in symbols:
+            result = run_cli_report(symbol, timeframe)
+            await update.message.reply_markdown_v2(result)
 
-        if result:
-            await update.message.reply_text(result)
-        else:
-            await update.message.reply_text(f"⚠️ No report generated for {mapped_symbol}.")
     except Exception as e:
-        logger.exception("[TelegramBot] Error in /report command")
-        await update.message.reply_text(f"⚠️ Error: {e}")
-
-def main():
-    print("🐞 DEBUG: main() is running...")
-
-    token = os.getenv("TELEGRAM_BOT_TOKEN")
-    if not token:
-        print("⚠️ TELEGRAM_BOT_TOKEN environment variable not set.")
-        return
-
-    application = Application.builder().token(token).build()
-
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("report", report))
-
-    print("🌸 [TelegramBot] KawaiiTrader Bot is running and polling Telegram... 🌸")
-    application.run_polling()
+        await update.message.reply_text(f"Error: {e}")
 
 if __name__ == "__main__":
-    main()
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    app.add_handler(CommandHandler("report", report))
+    print("Telegram bot is running...")
+    app.run_polling()

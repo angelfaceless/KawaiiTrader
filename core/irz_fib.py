@@ -1,3 +1,5 @@
+from core.report_types import Retracement, Target
+
 def calculate_irz_projection(range_low, range_high, manipulation_direction):
     try:
         # Reverse the projection direction — project *against* the manipulation
@@ -14,8 +16,11 @@ def calculate_irz_projection(range_low, range_high, manipulation_direction):
         else:
             return {
                 "message": "🟪 No valid manipulation direction.",
-                "irz_levels": [],
+                "irz_zone": None,
+                "retracements": [],
+                "targets": [],
                 "target_levels": [],
+                "irz_levels": [],
                 "anchor": None
             }
 
@@ -30,33 +35,53 @@ def calculate_irz_projection(range_low, range_high, manipulation_direction):
             -1.0: fib_start + diff * -1.0,
         }
 
-        irz_levels = [
+        retracement_values = [
             round(fib_levels[0.618], 2),
             round(fib_levels[0.707], 2),
             round(fib_levels[0.786], 2),
         ]
 
-        target_levels = [
+        target_values = [
             round(fib_levels[-0.236], 2),
             round(fib_levels[-0.618], 2),
             round(fib_levels[-1.0], 2),
         ]
 
+        retracement_objs = [
+            Retracement(label="0.618", level=round(fib_levels[0.618], 2)),
+            Retracement(label="0.707", level=round(fib_levels[0.707], 2)),
+            Retracement(label="0.786", level=round(fib_levels[0.786], 2)),
+        ]
+
+        target_objs = [
+            Target(label="-0.236", level=round(fib_levels[-0.236], 2)),
+            Target(label="-0.618", level=round(fib_levels[-0.618], 2)),
+            Target(label="-1.0", level=round(fib_levels[-1.0], 2)),
+        ]
+
         message = f"""🟪 IRZ Levels (projected {'upward' if manipulation_direction == 'down' else 'downward'}):
-Retrace Zone → {irz_levels[0]} / {irz_levels[1]} / {irz_levels[2]}
-Profit Targets → {target_levels[0]} / {target_levels[1]} / {target_levels[2]}"""
+Retrace Zone → {retracement_values[0]} / {retracement_values[1]} / {retracement_values[2]}
+Profit Targets → {target_values[0]} / {target_values[1]} / {target_values[2]}"""
+
+        irz_zone = f"{retracement_values[2]}–{retracement_values[0]}"
 
         return {
             "message": message,
-            "irz_levels": irz_levels,
-            "target_levels": target_levels,
+            "irz_zone": irz_zone,
+            "retracements": retracement_objs,
+            "targets": target_objs,
+            "target_levels": target_values,  # Legacy fallback
+            "irz_levels": retracement_values,  # Legacy fallback
             "anchor": anchor
         }
 
     except Exception as e:
         return {
             "message": f"🟪 IRZ projection failed: {e}",
-            "irz_levels": [],
+            "irz_zone": None,
+            "retracements": [],
+            "targets": [],
             "target_levels": [],
+            "irz_levels": [],
             "anchor": None
         }

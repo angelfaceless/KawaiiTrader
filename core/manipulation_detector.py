@@ -1,7 +1,4 @@
-# core/manipulation_detector.py
-
 import pandas as pd
-
 
 def detect_manipulation(df: pd.DataFrame, range_info: dict) -> dict:
     """
@@ -15,6 +12,10 @@ def detect_manipulation(df: pd.DataFrame, range_info: dict) -> dict:
     range_low = range_info["range_low"]
     range_high = range_info["range_high"]
     window = range_info.get("window", 50)  # how many bars formed the range
+
+    # Normalize index/columns
+    df = df.reset_index()
+    df.columns = df.columns.str.lower()
 
     # Only look at candles that came after the consolidation
     post_range_df = df.iloc[-(len(df) - window):]
@@ -59,10 +60,24 @@ def detect_manipulation(df: pd.DataFrame, range_info: dict) -> dict:
         status = "clean"
         msg = "No manipulation detected."
 
-    return {
+    result = {
         "manipulated": manipulated,
         "returned_to_range": returned_to_range,
         "direction": direction,
         "status": status,
-        "message": msg
+        "message": msg,
     }
+
+    # ✅ Only add price + timestamp if there was a breakout
+    if direction and breakout_idx is not None:
+        breakout_row = post_range_df.loc[breakout_idx]
+        result["price"] = breakout_row["high"] if direction == "up" else breakout_row["low"]
+
+        if "timestamp" in breakout_row:
+            result["timestamp"] = str(breakout_row["timestamp"])
+        elif post_range_df.index.name == "timestamp":
+            result["timestamp"] = str(breakout_row.name)
+        else:
+            result["timestamp"] = "unknown"
+
+    return result

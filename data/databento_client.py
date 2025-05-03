@@ -45,10 +45,7 @@ def fetch_ohlcv(symbol: str, timeframe: str = "15min", lookback_days: int = None
     original_symbol = symbol
 
     try:
-        # Resolve aliases like "ES" → "ES.c.0"
         symbol = resolve_symbol_alias(symbol)
-
-        # Strip Polygon-style continuous suffix
         if symbol.endswith(".c.0"):
             symbol = symbol.split(".")[0]
 
@@ -61,9 +58,9 @@ def fetch_ohlcv(symbol: str, timeframe: str = "15min", lookback_days: int = None
 
         start_time = end_time - timedelta(days=lookback_days or get_dynamic_lookback(timeframe))
 
-        # Determine dataset and symbology
-        if symbol in ["CME.BTC/USD", "CME.ETH/USD"]:
-            dataset = "CME.MDP3"
+        # ✅ Patch: BTC must use GLBX.MDP3
+        if "BTC" in symbol or "/USD" in symbol:
+            dataset = "GLBX.MDP3"
             stype = "raw_symbol"
         else:
             dataset = "GLBX.MDP3"
@@ -87,7 +84,6 @@ def fetch_ohlcv(symbol: str, timeframe: str = "15min", lookback_days: int = None
 
         client = Historical(key=API_KEY)
 
-        # Try ohlcv_1s schema first
         try:
             data = client.timeseries.get_range(
                 dataset=dataset,
@@ -122,7 +118,6 @@ def fetch_ohlcv(symbol: str, timeframe: str = "15min", lookback_days: int = None
         df.set_index("timestamp", inplace=True)
 
         if "price" in df.columns and "size" in df.columns:
-            # Trade schema → build OHLCV manually
             df = df[["price", "size"]].rename(columns={"price": "close", "size": "volume"})
             resample_str = TIMEFRAME_MAP.get(timeframe)
             candles = pd.DataFrame()
@@ -133,7 +128,6 @@ def fetch_ohlcv(symbol: str, timeframe: str = "15min", lookback_days: int = None
             candles["volume"] = df["volume"].resample(resample_str).sum()
             candles.dropna(inplace=True)
         else:
-            # Already OHLCV
             if timeframe != "1s":
                 resample_str = TIMEFRAME_MAP.get(timeframe)
                 candles = df.resample(resample_str).agg({

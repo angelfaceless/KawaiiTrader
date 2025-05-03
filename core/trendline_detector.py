@@ -1,84 +1,77 @@
-# kawaiitrader/core/trendline_detector.py
-
-import pandas as pd
 import numpy as np
-from sklearn.linear_model import LinearRegression, RANSACRegressor
+import pandas as pd
+from scipy.stats import linregress
 
-def detect_pivots(df: pd.DataFrame, window_sizes=[3, 5, 7]):
-    """
-    Detect pivot highs and lows based on candle bodies.
-    """
-    body_highs = df[['open', 'close']].max(axis=1)
-    body_lows = df[['open', 'close']].min(axis=1)
 
+def detect_pivots(df, window=5):
+    highs = df["high"]
+    lows = df["low"]
     pivot_highs = []
     pivot_lows = []
 
-    for w in window_sizes:
-        for i in range(w, len(df) - w):
-            window_slice = body_highs[i - w:i + w + 1]
-            if df.index[i] == window_slice.idxmax():
-                pivot_highs.append((i, window_slice.max()))
-            
-            window_slice = body_lows[i - w:i + w + 1]
-            if df.index[i] == window_slice.idxmin():
-                pivot_lows.append((i, window_slice.min()))
+    for i in range(window, len(df) - window):
+        if highs[i] == max(highs[i - window:i + window + 1]):
+            pivot_highs.append((i, highs[i]))
+        if lows[i] == min(lows[i - window:i + window + 1]):
+            pivot_lows.append((i, lows[i]))
 
     return pivot_highs, pivot_lows
 
-def fit_trendline(points, kind="support"):
-    """
-    Fit a linear or RANSAC regression trendline to a list of pivot points.
-    """
-    if len(points) < 2:
+
+def fit_trendline(points, kind="support", r_threshold=0.85):
+    if len(points) < 3:
         return None
 
-    x = np.array([p[0] for p in points]).reshape(-1, 1)
-    y = np.array([p[1] for p in points])
+    x = np.array([pt[0] for pt in points])
+    y = np.array([pt[1] for pt in points])
+    slope, intercept, r_value, _, _ = linregress(x, y)
 
-    try:
-        model = RANSACRegressor()
-        model.fit(x, y)
-        slope = model.estimator_.coef_[0]
-        intercept = model.estimator_.intercept_
-        return slope, intercept
-    except Exception:
+    if abs(r_value) < r_threshold:
         return None
 
-def classify_trendline(df: pd.DataFrame, slope, intercept):
-    """
-    Determine if the trendline acts as support or resistance at the current price.
-    """
-    current_index = len(df) - 1
-    current_price = df.iloc[-1]["close"]
-    trendline_value = slope * current_index + intercept
+    return slope, intercept
 
-    if current_price > trendline_value:
+
+def classify_trendline(df, slope, intercept):
+    latest_idx = len(df) - 1
+    current_price = df["close"].iloc[-1]
+    trend_value = slope * latest_idx + intercept
+
+    if current_price >= trend_value:
         return "Support"
-    elif current_price < trendline_value:
-        return "Resistance"
     else:
-        return "Touching"
+        return "Resistance"
 
-def detect_trendline(df: pd.DataFrame, timeframe: str = "1h"):
+
+def detect_trendline(df: pd.DataFrame, timeframe: str = "1h", symbol: str = "ES"):
     pivot_highs, pivot_lows = detect_pivots(df)
 
     support_trend = fit_trendline(pivot_lows, "support")
     resistance_trend = fit_trendline(pivot_highs, "resistance")
 
-    results = []
+    messages = []
+    vectors = {}
 
     if support_trend:
         role = classify_trendline(df, *support_trend)
         if role == "Support":
-            results.append(f"🟩 Support trendline detected ({timeframe})")
+            vectors["Support"] = support_trend
+            levels = [f"{lvl:.2f}" for _, lvl in pivot_lows]
+            messages.append(f"🟩 Support trendline detected ({timeframe})")
+            messages.append(f"    Touch points: {', '.join(levels)}")
 
     if resistance_trend:
         role = classify_trendline(df, *resistance_trend)
         if role == "Resistance":
-            results.append(f"🟥 Resistance trendline detected ({timeframe})")
+            vectors["Resistance"] = resistance_trend
+            levels = [f"{lvl:.2f}" for _, lvl in pivot_highs]
+            messages.append(f"🟥 Resistance trendline detected ({timeframe})")
+            messages.append(f"    Touch points: {', '.join(levels)}")
 
-    if not results:
-        results.append(f"No active trendline near current price ({timeframe})")
+    if not messages:
+        messages.append(f"No active trendline near current price ({timeframe})")
 
-    return results
+    return {
+        "messages": messages,
+        "vectors": vectors
+    }

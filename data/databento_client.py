@@ -56,6 +56,11 @@ def fetch_ohlcv(symbol: str, timeframe: str = "15min", lookback_days: int = None
         if end_time > MAX_AVAILABLE_END:
             end_time = MAX_AVAILABLE_END
 
+        # ✅ Weekend lookback patch
+        if is_weekend(now):
+            print(f"[Resolver] Weekend detected — extending lookback to 3 days")
+            lookback_days = 3
+
         start_time = end_time - timedelta(days=lookback_days or get_dynamic_lookback(timeframe))
 
         # ✅ Patch: BTC must use GLBX.MDP3

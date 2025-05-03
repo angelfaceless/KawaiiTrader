@@ -1,48 +1,55 @@
-import sys
-import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# core/markdown_formatter.py
 
-from core.report_types import Report
+def escape_telegram(text) -> str:
+    """
+    Escapes special characters for Telegram MarkdownV2.
+    Accepts any input and safely converts it to string.
+    """
+    text = str(text)
+    for ch in r"_*[]()~`>#+-=|{}.!":
+        text = text.replace(ch, f"\\{ch}")
+    return text
 
-def format_report_markdown(report: Report) -> str:
-    lines = []
-    lines.append(f"🌸 *{report.symbol.upper()} Report @ {report.timeframe}*")
-    lines.append(f"🔹 Range: `{report.range_low}` to `{report.range_high}`")
-    lines.append(f"📈 Bias: *{report.directional_bias}*")
+def format_report_markdown(report) -> str:
+    esc = escape_telegram
 
-    if report.support_levels:
-        levels = ", ".join([f"{lvl:.2f}" for lvl in report.support_levels])
-        lines.append(f"\n🟦 *Support Levels:* {levels}")
+    retrace_str = "\n".join(
+        f"• `{esc(r.label)}`: {esc(r.level)}" for r in report.retracements
+    ) if report.retracements else "No retracement zone"
 
-    if report.resistance_levels:
-        levels = ", ".join([f"{lvl:.2f}" for lvl in report.resistance_levels])
-        lines.append(f"🟥 *Resistance Levels:* {levels}")
+    target_str = "\n".join(
+        f"🎯 *{esc(t.label)}*: `{esc(t.level)}`" for t in report.targets
+    ) if report.targets else "No targets"
 
-    if report.trendline_summary:
-        lines.append(f"\n📐 *Trendline Summary:*\n{report.trendline_summary}")
+    manipulation_str = "\n".join(
+        f"{esc(m.timestamp)} — Broke *{esc(m.direction)}* at `{esc(m.price)}`"
+        for m in report.manipulations
+    ) if report.manipulations else "No manipulation detected"
 
-    # 🟪 IRZ Section
-    if report.irz_message or report.retracements or report.targets:
-        if report.irz_message:
-            direction_line = report.irz_message.split(":")[0].replace("🟪", "").strip()
-            lines.append(f"\n🟪 *{direction_line}*")
-        if report.irz_zone:
-            lines.append(f"IRZ Zone: `{report.irz_zone}`")
-        if report.retracements:
-            lines.append("\n🔄 *Retracement Levels:*")
-            for r in report.retracements:
-                lines.append(f"• `{r.label}` → `{r.level:.2f}`")
-        if report.targets:
-            lines.append("\n🎯 *Targets:*")
-            for t in report.targets:
-                lines.append(f"• `{t.label}` → `{t.level:.2f}`")
+    return f"""
+*{esc(report.symbol)} — {esc(report.timeframe)} Report*
 
-    if report.manipulations:
-        lines.append("\n⚠️ *Manipulation Events:*")
-        for m in report.manipulations:
-            lines.append(f"• `{m.direction}` at `{m.price:.2f}` ({m.timestamp})")
+*Bias:* {esc(report.directional_bias)}
+*Range:* `{esc(report.range_low)} - {esc(report.range_high)}`
 
-    if report.chart_path:
-        lines.append(f"\n📈 Chart saved to: `{report.chart_path}`")
+*Support Levels:*
+{', '.join(f'`{esc(s)}`' for s in report.support_levels)}
 
-    return "\n".join(lines)
+*Resistance Levels:*
+{', '.join(f'`{esc(r)}`' for r in report.resistance_levels)}
+
+*Trendlines:*
+{esc(report.trendline_summary or 'No trendlines')}
+
+*Manipulation:*
+{manipulation_str}
+
+*IRZ Retracement Zone:*
+{retrace_str}
+
+{esc(report.irz_message or '')}
+
+{target_str}
+
+🖼 [Chart Image]({esc(report.chart_path)})
+""".strip()

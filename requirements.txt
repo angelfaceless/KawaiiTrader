@@ -1,3 +1,7 @@
-# /mnt/data/kawaiitrader_full/requirements.txt
-
-# TODO: implement
+python-telegram-bot==20.6
+python-dotenv
+matplotlib
+pandas
+numpy
+requests
+databento

@@ -8,11 +8,13 @@ def calculate_irz_projection(range_low, range_high, manipulation_direction):
             fib_start = range_high
             fib_end = range_low
             anchor = range_high
+            projection_direction = "up"
         elif manipulation_direction == "up":
             # Price broke up and came back = bearish reversal = project downward
             fib_start = range_low
             fib_end = range_high
             anchor = range_low
+            projection_direction = "down"
         else:
             return {
                 "message": "🟪 No valid manipulation direction.",
@@ -21,7 +23,8 @@ def calculate_irz_projection(range_low, range_high, manipulation_direction):
                 "targets": [],
                 "target_levels": [],
                 "irz_levels": [],
-                "anchor": None
+                "anchor": None,
+                "projection_direction": None
             }
 
         diff = fib_end - fib_start
@@ -59,7 +62,7 @@ def calculate_irz_projection(range_low, range_high, manipulation_direction):
             Target(label="-1.0", level=round(fib_levels[-1.0], 2)),
         ]
 
-        message = f"""🟪 IRZ Levels (projected {'upward' if manipulation_direction == 'down' else 'downward'}):
+        message = f"""🟪 IRZ Levels (projected {'upward' if projection_direction == 'up' else 'downward'}):
 Retrace Zone → {retracement_values[0]} / {retracement_values[1]} / {retracement_values[2]}
 Profit Targets → {target_values[0]} / {target_values[1]} / {target_values[2]}"""
 
@@ -72,7 +75,8 @@ Profit Targets → {target_values[0]} / {target_values[1]} / {target_values[2]}"
             "targets": target_objs,
             "target_levels": target_values,  # Legacy fallback
             "irz_levels": retracement_values,  # Legacy fallback
-            "anchor": anchor
+            "anchor": anchor,
+            "projection_direction": projection_direction  # ✅ This line enables bias override
         }
 
     except Exception as e:
@@ -83,5 +87,6 @@ Profit Targets → {target_values[0]} / {target_values[1]} / {target_values[2]}"
             "targets": [],
             "target_levels": [],
             "irz_levels": [],
-            "anchor": None
+            "anchor": None,
+            "projection_direction": None
         }

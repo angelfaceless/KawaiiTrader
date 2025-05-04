@@ -49,10 +49,10 @@ def run_analysis(symbol: str, timeframe: str = "1h") -> Report:
             irz_message = fib_data.get("message")
 
             for t in fib_data.get("targets", []):
-                targets.append(t)  # ✅ Already a Target instance
+                targets.append(t)
 
             for r in fib_data.get("retracements", []):
-                retracements.append(r)  # ✅ Already a Retracement instance
+                retracements.append(r)
 
         if manipulation["status"] != "clean":
             manipulations.append(ManipulationEvent(
@@ -60,6 +60,14 @@ def run_analysis(symbol: str, timeframe: str = "1h") -> Report:
                 price=manipulation["price"],
                 timestamp=manipulation["timestamp"]
             ))
+
+    # ✅ Override bias based on IRZ projection
+    if fib_data:
+        direction = fib_data.get("projection_direction")
+        if direction == "up":
+            directional_bias = "bullish"
+        elif direction == "down":
+            directional_bias = "bearish"
 
     # 🖼️ Chart output
     chart_path = plot_full_analysis(

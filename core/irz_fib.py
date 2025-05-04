@@ -4,13 +4,11 @@ def calculate_irz_projection(range_low, range_high, manipulation_direction):
     try:
         # Reverse the projection direction — project *against* the manipulation
         if manipulation_direction == "down":
-            # Price broke down and came back = bullish reversal = project upward
             fib_start = range_high
             fib_end = range_low
             anchor = range_high
             projection_direction = "up"
         elif manipulation_direction == "up":
-            # Price broke up and came back = bearish reversal = project downward
             fib_start = range_low
             fib_end = range_high
             anchor = range_low
@@ -24,7 +22,8 @@ def calculate_irz_projection(range_low, range_high, manipulation_direction):
                 "target_levels": [],
                 "irz_levels": [],
                 "anchor": None,
-                "projection_direction": None
+                "projection_direction": None,
+                "full_levels": {}
             }
 
         diff = fib_end - fib_start
@@ -36,6 +35,7 @@ def calculate_irz_projection(range_low, range_high, manipulation_direction):
             -0.236: fib_start + diff * -0.236,
             -0.618: fib_start + diff * -0.618,
             -1.0: fib_start + diff * -1.0,
+            1.0: fib_start + diff * 1.0,  # ✅ added
         }
 
         retracement_values = [
@@ -73,10 +73,11 @@ Profit Targets → {target_values[0]} / {target_values[1]} / {target_values[2]}"
             "irz_zone": irz_zone,
             "retracements": retracement_objs,
             "targets": target_objs,
-            "target_levels": target_values,  # Legacy fallback
-            "irz_levels": retracement_values,  # Legacy fallback
+            "target_levels": target_values,
+            "irz_levels": retracement_values,
             "anchor": anchor,
-            "projection_direction": projection_direction  # ✅ This line enables bias override
+            "projection_direction": projection_direction,
+            "full_levels": fib_levels  # ✅ added
         }
 
     except Exception as e:
@@ -88,5 +89,6 @@ Profit Targets → {target_values[0]} / {target_values[1]} / {target_values[2]}"
             "target_levels": [],
             "irz_levels": [],
             "anchor": None,
-            "projection_direction": None
+            "projection_direction": None,
+            "full_levels": {}
         }

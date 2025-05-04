@@ -4,7 +4,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
-
 def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels, trendlines, fib_data, range_data):
     df = df.copy().tail(300)
     df.index.name = "Date"
@@ -53,6 +52,12 @@ def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels,
 
         for level in fib_data["target_levels"]:
             ax.plot([anchor_index, future_index], [level, level], color="white", linestyle="-", linewidth=1.5)
+
+        # ✅ 1.0 Fib level — dashed white
+        if "full_levels" in fib_data and 1.0 in fib_data["full_levels"]:
+            level_1_0 = fib_data["full_levels"][1.0]
+            ax.plot([anchor_index, future_index], [level_1_0, level_1_0],
+                    color="white", linestyle="--", linewidth=1.2)
 
         ax.plot([anchor_index, future_index], [fib_data["anchor"], fib_data["anchor"]],
                 color="gray", linestyle="-", linewidth=1.2)

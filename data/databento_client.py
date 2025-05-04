@@ -34,7 +34,11 @@ TIMEFRAME_MAP = {
 
 def get_dynamic_lookback(timeframe: str, target_candles: int = 80) -> int:
     seconds = TIMEFRAME_SECONDS.get(timeframe)
-    return math.ceil((target_candles * seconds) / 86400) if seconds else 2
+    if not seconds:
+        return 2
+    if timeframe == "1d":
+        return math.ceil((target_candles / 5) * 7)
+    return math.ceil((target_candles * seconds) / 86400)
 
 
 def is_weekend(dt: datetime) -> bool:
@@ -46,9 +50,6 @@ def fetch_ohlcv(symbol: str, timeframe: str = "15min", lookback_days: int = None
 
     try:
         symbol = resolve_symbol_alias(symbol)
-        if symbol.endswith(".c.0"):
-            symbol = symbol.split(".")[0]
-
         now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
         minute_mod = now.minute % 15
         aligned_now = now - timedelta(minutes=minute_mod)
@@ -56,19 +57,21 @@ def fetch_ohlcv(symbol: str, timeframe: str = "15min", lookback_days: int = None
         if end_time > MAX_AVAILABLE_END:
             end_time = MAX_AVAILABLE_END
 
-        # ✅ Weekend lookback patch
-        if is_weekend(now):
+        if is_weekend(now) and lookback_days is None:
             print(f"[Resolver] Weekend detected — extending lookback to 3 days")
             lookback_days = 3
 
         start_time = end_time - timedelta(days=lookback_days or get_dynamic_lookback(timeframe))
 
-        # ✅ Patch: BTC must use GLBX.MDP3
-        if "BTC" in symbol or "/USD" in symbol:
-            dataset = "GLBX.MDP3"
+        # ✅ Detect equity vs futures
+        is_equity = symbol.isalpha() and len(symbol) <= 5
+        if is_equity:
+            dataset = "XNAS.ITCH" if symbol.endswith("Q") or symbol in ["AAPL", "TSLA"] else "XNYS.ITCH"
             stype = "raw_symbol"
         else:
             dataset = "GLBX.MDP3"
+            if symbol.endswith(".c.0"):
+                symbol = symbol.split(".")[0]
             if is_weekend(now):
                 print(f"[Resolver] Weekend detected. Falling back to front-month for {symbol}")
                 fallback_contracts = {

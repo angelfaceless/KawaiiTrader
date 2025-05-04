@@ -9,8 +9,12 @@ def main():
         print("Usage: python3 main.py <symbol(s)> <timeframe(s)>")
         return
 
-    symbols = [arg for arg in args if not any(char.isdigit() for char in arg)]
-    timeframes = [arg for arg in args if any(char.isdigit() for char in arg)]
+    # ✅ Minimal edit: expand comma-separated inputs
+    raw_symbols = [arg for arg in args if not any(char.isdigit() for char in arg)]
+    raw_timeframes = [arg for arg in args if any(char.isdigit() for char in arg)]
+
+    symbols = [s.strip().upper() for arg in raw_symbols for s in arg.split(",")]
+    timeframes = [t.strip() for arg in raw_timeframes for t in arg.split(",")]
 
     if not symbols or not timeframes:
         print("Error: Please specify both symbol(s) and timeframe(s)")

@@ -1,4 +1,4 @@
-from data.databento_client import fetch_ohlcv
+from data.databento_client import fetch_ohlcv, get_dynamic_lookback
 from core.support_resistance import detect_support_resistance
 from core.trendline_detector import detect_trendline
 from core.range_detector import detect_body_range
@@ -9,10 +9,16 @@ from core.report_types import Report, Target, ManipulationEvent, Retracement
 
 def run_analysis(symbol: str, timeframe: str = "1h") -> Report:
     print(f"[Analyzer] Fetching data for {symbol} on {timeframe}")
-    df = fetch_ohlcv(symbol, timeframe)
+
+    target_candles = 365 if timeframe == "1d" else 120
+    lookback_days = get_dynamic_lookback(timeframe, target_candles=target_candles)
+    df = fetch_ohlcv(symbol, timeframe, lookback_days=lookback_days)
 
     if df is None or df.empty:
         raise ValueError(f"No data returned for {symbol} on {timeframe}")
+
+    if len(df) < 10:
+        print(f"⚠️ Only {len(df)} candles returned for {symbol} on {timeframe}")
 
     # 🟦 Support / Resistance
     supports, resistances = detect_support_resistance(df)
@@ -48,11 +54,11 @@ def run_analysis(symbol: str, timeframe: str = "1h") -> Report:
             irz_zone = fib_data.get("irz_zone")
             irz_message = fib_data.get("message")
 
-            for t in fib_data.get("targets", []):
-                targets.append(t)
-
-            for r in fib_data.get("retracements", []):
-                retracements.append(r)
+            if fib_data:
+                for t in fib_data.get("targets", []):
+                    targets.append(t)
+                for r in fib_data.get("retracements", []):
+                    retracements.append(r)
 
         if manipulation["status"] != "clean":
             manipulations.append(ManipulationEvent(

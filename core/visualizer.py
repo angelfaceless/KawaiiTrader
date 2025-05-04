@@ -6,7 +6,7 @@ import matplotlib.patches as patches
 
 
 def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels, trendlines, fib_data, range_data):
-    df = df.copy().tail(150)
+    df = df.copy().tail(300)
     df.index.name = "Date"
 
     fig, ax = plt.subplots(figsize=(14, 7))
@@ -32,9 +32,15 @@ def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels,
         ax.axhline(y=level, color="#77dd77", linestyle="-", linewidth=1.2)
 
     # ➖ Trendlines (light grey solid)
-    for role, (slope, intercept) in trendlines.items():
+    for role, trend in trendlines.items():
+        slope = trend["slope"]
+        intercept = trend["intercept"]
+        start_idx = trend["start_index"]
+
         x_vals = np.arange(len(df) + 10)
-        y_vals = slope * x_vals + intercept
+        x_shifted = x_vals - start_idx
+        y_vals = slope * x_shifted + intercept
+
         ax.plot(x_vals, y_vals, color="lightgrey", linestyle="-", linewidth=1.5)
 
     # 🟪 IRZ Fib levels

@@ -1,10 +1,4 @@
-# core/markdown_formatter.py
-
 def escape_telegram(text) -> str:
-    """
-    Escapes special characters for Telegram MarkdownV2.
-    Accepts any input and safely converts it to string.
-    """
     text = str(text)
     for ch in r"_*[]()~`>#+-=|{}.!":
         text = text.replace(ch, f"\\{ch}")

@@ -3,7 +3,7 @@ import math
 import pandas as pd
 from datetime import datetime, timedelta, timezone
 
-from databento import Historical
+from databento import Historical, Live
 from dotenv import load_dotenv
 from utils.symbols import resolve_symbol_alias
 
@@ -85,34 +85,49 @@ def fetch_ohlcv(symbol: str, timeframe: str = "15min", lookback_days: int = None
         else "GLBX.MDP3"
     )
 
-    client = Historical(key=API_KEY)
+    df = None
 
-    try:
-        data = client.timeseries.get_range(
-            dataset=dataset,
-            schema="ohlcv_1s",
-            symbols=final_symbol,
-            stype_in=stype,
-            start=start_time,
-            end=end_time,
-        )
-        df = data.to_df()
-        if df is None or df.empty or "ts_event" not in df.columns:
-            raise ValueError("ohlcv_1s missing or invalid")
-    except Exception:
-        data = client.timeseries.get_range(
-            dataset=dataset,
-            schema="trades",
-            symbols=final_symbol,
-            stype_in=stype,
-            start=start_time,
-            end=end_time,
-        )
-        if not data:
-            return None
-        df = data.to_df()
-        if df is None or df.empty or "ts_event" not in df.columns:
-            return None
+    if not is_weekend(now):
+        try:
+            client = Live().with_api_key(API_KEY)
+            resp = client.timeseries.get_last(
+                dataset=dataset,
+                schema="ohlcv_1s",
+                symbols=final_symbol,
+                stype_in=stype,
+            )
+            df = resp.to_df()
+        except Exception:
+            df = None
+
+    if df is None or df.empty or "ts_event" not in df.columns:
+        client = Historical(key=API_KEY)
+        try:
+            data = client.timeseries.get_range(
+                dataset=dataset,
+                schema="ohlcv_1s",
+                symbols=final_symbol,
+                stype_in=stype,
+                start=start_time,
+                end=end_time,
+            )
+            df = data.to_df()
+            if df is None or df.empty or "ts_event" not in df.columns:
+                raise ValueError("ohlcv_1s missing or invalid")
+        except Exception:
+            data = client.timeseries.get_range(
+                dataset=dataset,
+                schema="trades",
+                symbols=final_symbol,
+                stype_in=stype,
+                start=start_time,
+                end=end_time,
+            )
+            if not data:
+                return None
+            df = data.to_df()
+            if df is None or df.empty or "ts_event" not in df.columns:
+                return None
 
     df["timestamp"] = pd.to_datetime(df["ts_event"], unit="ns")
     df.set_index("timestamp", inplace=True)

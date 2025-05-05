@@ -13,6 +13,16 @@ from formatters.markdown_formatter import format_report_markdown
 load_dotenv()
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
+def normalize_timeframe(tf: str) -> str:
+    tf = tf.lower().replace("min", "m").replace("hour", "h").replace("hr", "h")
+    if tf.endswith("m") and tf[:-1].isdigit():
+        return f"{tf[:-1]}min"
+    elif tf.endswith("h") and tf[:-1].isdigit():
+        return f"{tf[:-1]}h"
+    elif tf == "daily":
+        return "1d"
+    return tf
+
 async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         args = context.args
@@ -20,12 +30,11 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("Usage: /report SYMBOL[,SYMBOL2,...] [TIMEFRAME1[,TIMEFRAME2,...]]")
             return
 
-        # ✅ Split args into symbols and timeframes cleanly
         raw_symbols = [arg for arg in args if not any(char.isdigit() for char in arg)]
         raw_timeframes = [arg for arg in args if any(char.isdigit() for char in arg)]
 
         symbols = [resolve_symbol(sym.strip().upper()) for group in raw_symbols for sym in group.split(",") if sym.strip()]
-        timeframes = [tf.strip() for group in raw_timeframes for tf in group.split(",") if tf.strip()]
+        timeframes = [normalize_timeframe(tf.strip()) for group in raw_timeframes for tf in group.split(",") if tf.strip()]
 
         if not symbols:
             await update.message.reply_text("❌ No valid symbols found.")

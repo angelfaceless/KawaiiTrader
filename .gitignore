@@ -1,20 +1,5 @@
-# Secrets and environment configs
 .env
-.env.*
-*.key
-
-# Bytecode
-__pycache__/
-*.py[cod]
-
-# OS junk
-.DS_Store
-
-# Logs and temp files
-*.log
-*.tmp
-.env
-.env
+.venv/
 __pycache__/
 *.pyc
-.DS_Store
+Charts/

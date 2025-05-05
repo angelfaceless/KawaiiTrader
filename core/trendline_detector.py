@@ -10,10 +10,10 @@ def detect_pivots(df, window=5):
     pivot_lows = []
 
     for i in range(window, len(df) - window):
-        if highs[i] == max(highs[i - window:i + window + 1]):
-            pivot_highs.append((i, highs[i]))
-        if lows[i] == min(lows[i - window:i + window + 1]):
-            pivot_lows.append((i, lows[i]))
+        if highs.iloc[i] == max(highs.iloc[i - window:i + window + 1]):
+            pivot_highs.append((i, highs.iloc[i]))
+        if lows.iloc[i] == min(lows.iloc[i - window:i + window + 1]):
+            pivot_lows.append((i, lows.iloc[i]))
 
     return pivot_highs, pivot_lows
 

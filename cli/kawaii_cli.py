@@ -22,7 +22,7 @@ def main():
 
     for symbol in symbols:
         for timeframe in timeframes:
-            print(f"\n[🟪 Running report for: {symbol} @ {timeframe}]")
+            print(f"\n[🌸 Running report for: {symbol} @ {timeframe}]")
             try:
                 report = run_analysis(symbol, timeframe)
                 print(format_report_markdown(report))

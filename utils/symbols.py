@@ -37,18 +37,25 @@ def resolve_mgc_contract() -> str:
     year = now.year
     code = month_codes[month]
     short_year = str(year)[-1]
-    return f"MGCM{short_year}"  # ✅ fixed: ensure valid MGC contract format like MGCM5
+    return f"MGCM{short_year}"
 
 def resolve_symbol_alias(symbol: str) -> str:
+    """
+    Resolve user-facing aliases to correct Databento symbols.
+
+    - Leaves futures roots (e.g., ES, NQ) untouched for .FUT logic.
+    - Resolves BTC, GC, MGC to active month contracts.
+    """
+    symbol = symbol.upper()
+
+    # Let root futures symbols pass through untouched
+    if symbol in {"ES", "MES", "NQ", "MNQ", "RTY", "YM"}:
+        return symbol
+
     aliases = {
-        "ES": "ES.c.0",
-        "MES": "MES.c.0",
-        "NQ": "NQ.c.0",
-        "MNQ": "MNQ.c.0",
-        "RTY": "RTY.c.0",
-        "YM": "YM.c.0",
         "BTC": resolve_btc_contract(),
         "GC": resolve_gc_contract(),
         "MGC": resolve_mgc_contract(),
     }
-    return aliases.get(symbol.upper(), symbol)
+
+    return aliases.get(symbol, symbol)

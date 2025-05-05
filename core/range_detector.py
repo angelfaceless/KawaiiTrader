@@ -1,5 +1,3 @@
-# core/range_detector.py
-
 import pandas as pd
 import numpy as np
 
@@ -9,7 +7,7 @@ def detect_consolidation_hybrid(
     window: int = 50,
     atr_multiplier: float = 1.25,
     tolerance_pct: float = 0.015,
-    min_bounces: int = 1  # ✅ now requires just 1 wick touch per side
+    min_bounces: int = 1
 ) -> dict:
     """
     Hybrid consolidation detection:
@@ -51,16 +49,6 @@ def detect_consolidation_hybrid(
     is_bouncing = low_touches >= min_bounces and high_touches >= min_bounces
     is_range = is_tight or is_bouncing
 
-    # Debug print
-    print("----- [Range Debug] -----")
-    print(f"ATR: {atr:.2f}")
-    print(f"Range: {range_low:.2f} – {range_high:.2f} (width: {range_width:.2f})")
-    print(f"Touch tolerance: ±{tolerance:.2f}")
-    print(f"Low touches (wick): {low_touches} | High touches (wick): {high_touches}")
-    print(f"ATR filter passed: {is_tight} | Bounce filter passed: {is_bouncing}")
-    print(f"Final decision: {'✅ Consolidation' if is_range else '❌ No range'}")
-    print("--------------------------")
-
     if is_range:
         msg = (
             f"Consolidation zone detected from {range_low:.2f} to {range_high:.2f} "
@@ -83,11 +71,10 @@ def detect_body_range(df: pd.DataFrame, timeframe: str) -> dict:
     """
     Entry point used by analyzer.py.
     """
-    print(f"[DEBUG] Running hybrid range detection on {len(df)} candles for {timeframe}")
     return detect_consolidation_hybrid(
         df,
         window=50,
         atr_multiplier=1.25,
         tolerance_pct=0.015,
-        min_bounces=1  # ✅ Final tuned value
+        min_bounces=1
     )

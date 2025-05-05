@@ -8,7 +8,7 @@ from core.visualizer import plot_full_analysis
 from core.report_types import Report, Target, ManipulationEvent, Retracement
 
 def run_analysis(symbol: str, timeframe: str = "1h") -> Report:
-    print(f"[Analyzer] Fetching data for {symbol} on {timeframe}")
+    
 
     target_candles = 365 if timeframe == "1d" else 120
     lookback_days = get_dynamic_lookback(timeframe, target_candles=target_candles)

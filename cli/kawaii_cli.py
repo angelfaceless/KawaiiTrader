@@ -52,7 +52,6 @@ def main():
             print(f"\n[🌸 Running report for: {symbol_input} @ {timeframe}]")
             
             symbol_details = resolve_symbol_alias(symbol_input)
-            print(f"[DEBUG kawaii_cli.py] Input symbol: '{symbol_input}', Resolved details: {symbol_details}")
             
             try:
                 report = run_analysis(symbol_details, timeframe)
@@ -63,4 +62,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

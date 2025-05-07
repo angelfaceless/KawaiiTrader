@@ -44,9 +44,9 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         for symbol in symbols:
             for tf in timeframes:
-                await update.message.reply_text(f"🌸 Running report for *{symbol}* @ `{tf}`...", parse_mode="Markdown")
+                await update.message.reply_text(f"🌸 Running report for *{symbol.get('input_symbol', symbol.get('db_symbol', '???'))}* @ `{tf}`...", parse_mode="Markdown")
 
-                report_obj = run_analysis(symbol, tf)
+                report_obj = run_analysis(symbol_details=symbol, timeframe=tf)
                 report_text = format_report_markdown(report_obj)
 
                 await update.message.reply_markdown_v2(report_text)

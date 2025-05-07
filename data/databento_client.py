@@ -12,9 +12,9 @@ load_dotenv()
 API_KEY = os.getenv("DATABENTO_API_KEY")
 
 TIMEFRAME_MAP = {
-    "1min": "1T",
-    "5min": "5T",
-    "15min": "15T",
+    "1min": "1min",
+    "5min": "5min",
+    "15min": "15min",
     "1h": "1H",
     "4h": "4H",
     "1d": "1D",
@@ -62,32 +62,49 @@ def fetch_ohlcv(symbol_details: dict, timeframe: str, lookback_days: int = None)
     db_stype_in = symbol_details["stype_in"]
     asset_class = symbol_details.get("asset_class", "unknown")
 
-    end_time = datetime.now(timezone.utc).replace(second=0, microsecond=0) - timedelta(minutes=15)
+    end_time = datetime.now(timezone.utc).replace(second=0, microsecond=0) - timedelta(minutes=12)
     if lookback_days is None:
         lookback_days = get_dynamic_lookback(timeframe)
     start_time = end_time - timedelta(days=lookback_days)
 
-    print(f"[Data] Fetching {db_symbol} from {db_dataset} ({db_stype_in}, {asset_class}) from {start_time} to {end_time} on {timeframe} timeframe...")
     sys.stdout.flush()
 
     df = pd.DataFrame()
     df_trades = pd.DataFrame()
 
     try:
-        data = client.timeseries.get_range(
-            dataset=db_dataset,
-            symbols=[db_symbol],
-            stype_in=db_stype_in,
-            schema="ohlcv-1s",
-            start=start_time,
-            end=end_time,
-        )
-        df = data.to_df() if data else pd.DataFrame()
+        try:
+            data = client.timeseries.get_range(
+                dataset=db_dataset,
+                symbols=[db_symbol],
+                stype_in=db_stype_in,
+                schema="ohlcv-1s",
+                start=start_time,
+                end=end_time,
+            )
+            df = data.to_df() if data else pd.DataFrame()
+        except Exception as e:
+            error_message = str(e)
+            if "data_end_after_available_end" in error_message:
+                actual_end_str_start = error_message.find("available up to ") + len("available up to ")
+                actual_end_str_end = error_message.find(".", actual_end_str_start)
+                if 0 <= actual_end_str_start < actual_end_str_end:
+                    corrected_end = error_message[actual_end_str_start:actual_end_str_end]
+                    end_time = pd.to_datetime(corrected_end)
+                    start_time = end_time - timedelta(days=lookback_days)
+                    data = client.timeseries.get_range(
+                        dataset=db_dataset,
+                        symbols=[db_symbol],
+                        stype_in=db_stype_in,
+                        schema="ohlcv-1s",
+                        start=start_time,
+                        end=end_time,
+                    )
+                    df = data.to_df() if data else pd.DataFrame()
+            else:
+                raise
 
-        if not df.empty:
-            print(f"[DEBUG] OHLCV columns: {df.columns.tolist()}")
-            print(f"[DEBUG] OHLCV preview:\n{df.head()}")
-        else:
+        if df.empty:
             print(f"[Warning] No OHLCV data — falling back to trades.")
             sys.stdout.flush()
 
@@ -151,17 +168,6 @@ def fetch_ohlcv(symbol_details: dict, timeframe: str, lookback_days: int = None)
         print(f"[ERROR_HANDLER] Caught exception: {type(e).__name__} - {e}")
         sys.stdout.flush()
         error_message = str(e)
-
-        if "data_end_after_available_end" in error_message.lower():
-            try:
-                actual_end_str_start = error_message.find("available up to ") + len("available up to ")
-                actual_end_str_end = error_message.find(".", actual_end_str_start)
-                if 0 <= actual_end_str_start < actual_end_str_end:
-                    available_time = error_message[actual_end_str_start:actual_end_str_end]
-                    print(f"[Data Hint] Databento says data ends at: {available_time}")
-            except Exception as parse_e:
-                print(f"[Debug] Failed to parse available end time: {parse_e}")
-                sys.stdout.flush()
 
         err_sym_display = db_symbol or "unknown_symbol"
         if err_sym_display not in error_message and "Symbol:" not in error_message:

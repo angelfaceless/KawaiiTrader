@@ -18,7 +18,7 @@ def detect_pivots(df, window=5):
     return pivot_highs, pivot_lows
 
 
-def fit_trendline(points, kind="support", r_threshold=0.85):
+def fit_trendline(points, kind="support", r_threshold=0.7):
     if len(points) < 3:
         return None
 

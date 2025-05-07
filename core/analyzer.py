@@ -7,24 +7,33 @@ from core.irz_fib import calculate_irz_projection
 from core.visualizer import plot_full_analysis
 from core.report_types import Report, Target, ManipulationEvent, Retracement
 
-def run_analysis(symbol: str, timeframe: str = "1h") -> Report:
+# run_analysis now accepts symbol_details dictionary
+def run_analysis(symbol_details: dict, timeframe: str = "1h") -> Report:
     
+    # Use input_symbol for user-facing elements, db_symbol for internal Databento calls (though fetch_ohlcv now handles details)
+    input_symbol = symbol_details.get("input_symbol", symbol_details.get("db_symbol", "Unknown"))
 
     target_candles = 365 if timeframe == "1d" else 120
     lookback_days = get_dynamic_lookback(timeframe, target_candles=target_candles)
-    df = fetch_ohlcv(symbol, timeframe, lookback_days=lookback_days)
+    
+    # Pass the entire symbol_details dictionary to fetch_ohlcv
+    df = fetch_ohlcv(symbol_details, timeframe, lookback_days=lookback_days)
 
     if df is None or df.empty:
-        raise ValueError(f"No data returned for {symbol} on {timeframe}")
+        raise ValueError(f"No data returned for {input_symbol} on {timeframe}")
 
     if len(df) < 10:
-        print(f"⚠️ Only {len(df)} candles returned for {symbol} on {timeframe}")
+        print(f"⚠️ Only {len(df)} candles returned for {input_symbol} on {timeframe}")
+
+    # ✅ Extract current price and timestamp
+    current_price = float(df["close"].iloc[-1])
+    current_price_time = df.index[-1].isoformat()
 
     # 🟦 Support / Resistance
     supports, resistances = detect_support_resistance(df)
 
     # 📐 Trendlines
-    trendline_data = detect_trendline(df, timeframe, symbol)
+    trendline_data = detect_trendline(df, timeframe, input_symbol)
     trendline_vectors = trendline_data["vectors"]
     trendline_summary = "\n".join(trendline_data["messages"])
 
@@ -78,7 +87,7 @@ def run_analysis(symbol: str, timeframe: str = "1h") -> Report:
     # 🖼️ Chart output
     chart_path = plot_full_analysis(
         df=df,
-        symbol=symbol,
+        symbol=input_symbol,
         timeframe=timeframe,
         support_levels=supports,
         resistance_levels=resistances,
@@ -88,7 +97,7 @@ def run_analysis(symbol: str, timeframe: str = "1h") -> Report:
     )
 
     return Report(
-        symbol=symbol,
+        symbol=input_symbol,
         timeframe=timeframe,
         range_low=range_low,
         range_high=range_high,
@@ -101,5 +110,7 @@ def run_analysis(symbol: str, timeframe: str = "1h") -> Report:
         chart_path=chart_path,
         targets=targets,
         manipulations=manipulations,
-        retracements=retracements
+        retracements=retracements,
+        current_price=current_price,  # ✅ added
+        current_price_time=current_price_time  # ✅ added
     )

@@ -48,14 +48,10 @@ def detect_manipulation(df: pd.DataFrame, range_info: dict) -> dict:
     # Final result
     if manipulated:
         status = "manipulated"
-        msg = (
-            f"🟨 Manipulation detected — price broke {direction} and returned into the range."
-        )
+        msg = f"🟨 Manipulation detected — price broke {direction} and returned into the range."
     elif direction:
         status = "awaiting_return"
-        msg = (
-            f"🟧 Breakout detected {direction} but price has NOT returned into the range yet."
-        )
+        msg = f"🟧 Breakout detected {direction} but price has NOT returned into the range yet."
     else:
         status = "clean"
         msg = "No manipulation detected."
@@ -73,11 +69,15 @@ def detect_manipulation(df: pd.DataFrame, range_info: dict) -> dict:
         breakout_row = post_range_df.loc[breakout_idx]
         result["price"] = breakout_row["high"] if direction == "up" else breakout_row["low"]
 
-        if "timestamp" in breakout_row:
-            result["timestamp"] = str(breakout_row["timestamp"])
-        elif post_range_df.index.name == "timestamp":
-            result["timestamp"] = str(breakout_row.name)
+        # Robust timestamp extraction
+        timestamp = None
+        if "ts_event" in breakout_row:
+            timestamp = pd.to_datetime(breakout_row["ts_event"])
+        elif "timestamp" in breakout_row:
+            timestamp = pd.to_datetime(breakout_row["timestamp"])
         else:
-            result["timestamp"] = "unknown"
+            timestamp = pd.to_datetime(breakout_row.name) if post_range_df.index.name else pd.NaT
+
+        result["timestamp"] = timestamp
 
     return result

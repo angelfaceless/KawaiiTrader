@@ -1,6 +1,7 @@
 import sys
 from core.analyzer import run_analysis
 from formatters.markdown_formatter import format_report_markdown
+from utils.symbols import resolve_symbol_alias
 
 def normalize_timeframe(tf: str) -> str:
     """Normalize user input timeframes like 5m, 1hr to system format."""
@@ -23,18 +24,18 @@ def main():
     args = sys.argv[1:]
 
     if not args:
-        print("Usage: python3 main.py <symbol(s)> <timeframe(s)>")
+        print("Usage: python3 kawaii_cli.py <symbol(s)> <timeframe(s)>")
+        print("Example: python3 kawaii_cli.py ES,AAPL 15min,1d")
         return
 
-    # 🧠 Step 1: Flatten and split on commas
     flat_args = [x.strip() for arg in args for x in arg.split(",") if x.strip()]
 
-    # 🧠 Step 2: Classify into symbols and timeframes
     raw_symbols = []
     raw_timeframes = []
     for item in flat_args:
         cleaned = item.lower()
-        if any(char.isdigit() for char in cleaned):  # timeframe
+        # A simple check if it contains a digit or is a known timeframe string
+        if any(char.isdigit() for char in cleaned) or cleaned in ["1d", "1w", "1month", "d", "w", "month", "min", "h", "hr"]:
             raw_timeframes.append(item)
         else:
             raw_symbols.append(item)
@@ -46,11 +47,20 @@ def main():
         print("Error: Please specify both symbol(s) and timeframe(s)")
         return
 
-    for symbol in symbols:
+    for symbol_input in symbols:
         for timeframe in timeframes:
-            print(f"\n[🌸 Running report for: {symbol} @ {timeframe}]")
+            print(f"\n[🌸 Running report for: {symbol_input} @ {timeframe}]")
+            
+            symbol_details = resolve_symbol_alias(symbol_input)
+            print(f"[DEBUG kawaii_cli.py] Input symbol: '{symbol_input}', Resolved details: {symbol_details}")
+            
             try:
-                report = run_analysis(symbol, timeframe)
+                report = run_analysis(symbol_details, timeframe)
                 print(format_report_markdown(report))
             except Exception as e:
-                print(f"[ERROR] Failed to analyze {symbol} on {timeframe}: {e}")
+                db_symbol_for_error = symbol_details.get("db_symbol", symbol_details.get("symbol", symbol_input))
+                print(f"[ERROR] Failed to analyze {db_symbol_for_error} (input: {symbol_input}) on {timeframe}: {e}")
+
+if __name__ == "__main__":
+    main()
+

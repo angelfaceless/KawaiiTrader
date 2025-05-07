@@ -1,3 +1,6 @@
+from datetime import datetime
+from zoneinfo import ZoneInfo  # Requires Python 3.9+
+
 def escape_telegram(text) -> str:
     text = str(text)
     for ch in r"_*[]()~`>#+-=|{}.!":
@@ -8,7 +11,7 @@ def format_report_markdown(report) -> str:
     esc = escape_telegram
 
     retrace_str = "\n".join(
-        f"• `{esc(r.label)}`: {esc(r.level)}" for r in report.retracements
+        f"• `{esc(rt.label)}`: {esc(rt.level)}" for rt in report.retracements
     ) if report.retracements else "No retracement zone"
 
     target_str = "\n".join(
@@ -20,17 +23,26 @@ def format_report_markdown(report) -> str:
         for m in report.manipulations
     ) if report.manipulations else "No manipulation detected"
 
+    # ✅ Format current price and convert to America/New_York
+    if report.current_price is not None and report.current_price_time:
+        dt_utc = datetime.fromisoformat(report.current_price_time)
+        dt_est = dt_utc.astimezone(ZoneInfo("America/New_York"))
+        readable_time = dt_est.strftime("%A, %B %d, %Y at %I:%M %p %Z")
+        current_price_str = f"📌 *Current Price:* `{esc(report.current_price)}` on {esc(readable_time)}\n"
+    else:
+        current_price_str = ""
+
     return f"""
 *{esc(report.symbol)} — {esc(report.timeframe)} Report*
-
+{current_price_str}
 *Bias:* {esc(report.directional_bias)}
 *Range:* `{esc(report.range_low)} - {esc(report.range_high)}`
 
 *Support Levels:*
-{', '.join(f'`{esc(s)}`' for s in report.support_levels)}
+{', '.join(f'`{esc(str(s))}`' for s in report.support_levels)}
 
 *Resistance Levels:*
-{', '.join(f'`{esc(r)}`' for r in report.resistance_levels)}
+{', '.join(f'`{esc(str(r))}`' for r in report.resistance_levels)}
 
 *Trendlines:*
 {esc(report.trendline_summary or 'No trendlines')}

@@ -1,61 +1,149 @@
 from datetime import datetime, timezone
 
-def resolve_btc_contract() -> str:
-    """Resolve BTC to its active front-month contract (e.g. BTCK5)."""
-    month_codes = {
-        1: "F", 2: "G", 3: "H", 4: "J", 5: "K", 6: "M",
-        7: "N", 8: "Q", 9: "U", 10: "V", 11: "X", 12: "Z"
-    }
-    now = datetime.now(timezone.utc)
-    month = now.month
-    year = now.year
-    code = month_codes[month]
-    short_year = str(year)[-1]
-    return f"BTC{code}{short_year}"
+# This list contains all the CME Globex MDP3 futures roots
+ALL_CME_FUTURES_ROOTS = [
+    "AAK", "ABH", "ABI", "ABS", "ABT", "ABX", "ABY", "ACB", "ACD", "ADB", "ADE", "ADJ", "ADR", "ADT", "AEB", 
+    "AEP", "AET", "AEZ", "AFE", "AFF", "AFH", "AFI", "AFK", "AFR", "AFT", "AFY", "AGA", "AGE", "AGF", "AGT", 
+    "AGX", "AHJ", "AHL", "AHM", "AJ", "AJB", "AJJ", "AJL", "AJR", "AJS", "AJY", "AKL", "AKR", "AKS", "AKX", 
+    "AKZ", "ALA", "ALB", "ALI", "ALM", "ALX", "ALY", "AML", "ANC", "ANE", "ANL", "ANT", "AOB", "AOH", "AOJ", 
+    "AOL", "APA", "APS", "AQA", "AQK", "AQR", "AQT", "ARE", "ARR", "ART", "ARY", "ASD", "ASP", "ASR", "AST", 
+    "ATP", "ATU", "ATY", "AUB", "AUF", "AUH", "AUI", "AUJ", "AUP", "AUS", "AUW", "AVK", "AVL", "AVU", "AVZ", 
+    "AW", "AWJ", "AWQ", "AWT", "AXA", "AXB", "AY", "AYV", "AYX", "AZL", "BAS", "BB", "BBT", "BCR", "BCX", 
+    "BD", "BDB", "BEB", "BEF", "BF", "BFR", "BIB", "BIO", "BIT", "BJ", "BK", "BKF", "BKT", "BLK", "BM", 
+    "BNB", "BOB", "BOO", "BOS", "BOT", "BPA", "BPS", "BPU", "BQ", "BQS", "BSB", "BTB", "BTC", "BTE", "BUB", 
+    "BUC", "BUS", "BVS", "BZ", "BZL", "BZS", "BZT", "CAY", "CB", "CBB", "CCM", "CFB", "CFC", "CGB", "CGO", 
+    "CHI", "CHL", "CHP", "CJ", "CJY", "CKS", "CL", "CLD", "CLL", "CLS", "CLT", "CMB", "CMF", "CMS", "CNH", 
+    "COB", "COH", "COL", "COT", "CPB", "CPD", "CPO", "CPP", "CPV", "CQ", "CRB", "CRG", "CSC", "CSX", "CT", 
+    "CU", "CUP", "CUS", "CV", "CWR", "CX", "CY", "CZK", "DAB", "DAX", "DAZ", "DBB", "DBL", "DBT", "DC", 
+    "DCB", "DCL", "DCW", "DEB", "DEN", "DEP", "DFN", "DGY", "DHA", "DMA", "DRS", "DRT", "DSA", "DVE", "DVT", 
+    "DY", "EAA", "EAB", "EAC", "EAD", "EAE", "EAT", "EAW", "EBE", "EBN", "EBR", "ECCL", "ECD", "ECES", "ECF", 
+    "ECGC", "ECHG", "ECK", "ECNG", "ECNQ", "ECSI", "ECW", "ECYM", "EDP", "EDW", "EFF", "EFM", "EGB", "EGN", 
+    "EGT", "EH", "EHF", "EHR", "EI", "EIC", "EID", "EIT", "EIY", "EJL", "EMB", "EMC", "EMD", "EMT", "EN", 
+    "ENB", "ENK", "ENP", "ENS", "ENY", "EOB", "EPN", "EPZ", "ERL", "ES", "ESB", "ESG", "ESK", "ESQ", "ESR", 
+    "ESS", "EST", "ESX", "ETB", "ETC", "ETE", "ETH", "ETW", "EUB", "EUS", "EVC", "EWB", "EWG", "EWN", "EWV", 
+    "EXR", "EYB", "EYT", "FAL", "FBD", "FBT", "FCB", "FCN", "FEF", "FEW", "FFB", "FIT", "FIX", "FL", "FLB", 
+    "FLJ", "FLP", "FO", "FOA", "FOB", "FOL", "FOM", "FOR", "FRC", "FRS", "FSF", "FSS", "FTB", "FTC", "FTL", 
+    "FTT", "FTU", "FTW", "FVB", "FYA", "FYN", "FYT", "FYW", "FZE", "GBB", "GBR", "GC", "GCB", "GCC", "GCD", 
+    "GCG", "GCI", "GCK", "GCM", "GCT", "GCU", "GD", "GDH", "GDK", "GDL", "GDT", "GEO", "GES", "GF", "GFC", 
+    "GFT", "GHB", "GHS", "GHY", "GIE", "GIT", "GK", "GKS", "GLS", "GMB", "GMS", "GMY", "GNB", "GNF", "GNL", 
+    "GNO", "GNS", "GOC", "GSP", "GSW", "GUD", "GUS", "GVS", "GWS", "GY", "GYS", "GZ", "HBX", "HCY", "HDG", 
+    "HE", "HET", "HG", "HGB", "HGF", "HGS", "HGT", "HH", "HHT", "HIA", "HIB", "HIL", "HJC", "HO", "HOA", 
+    "HOB", "HOL", "HOT", "HP", "HPD", "HPE", "HQ", "HQX", "HQZ", "HR", "HRC", "HRP", "HRX", "HRZ", "HS", 
+    "HSX", "HSZ", "HTA", "HTB", "HTT", "HUF", "HW", "HWA", "HWX", "HWZ", "IBE", "IBS", "IBV", "IDL", "ILS", 
+    "IPO", "IPT", "ISA", "IST", "ITB", "ITP", "JA", "JBK", "JBT", "JCC", "JCY", "JDL", "JE", "JET", "JFB", 
+    "JFC", "JKB", "JKF", "JKM", "JKY", "JNC", "JNL", "JPK", "JPP", "JPT", "JQ", "JTB", "KE", "KET", "KNS", 
+    "KP", "KPK", "KPN", "KQ", "KQK", "KQN", "KR", "KRK", "KRN", "KRW", "KS", "KSK", "KSN", "KT", "KW", 
+    "KWK", "KWN", "KZS", "LAF", "LAP", "LAV", "LAX", "LBR", "LE", "LED", "LEL", "LET", "LHV", "LL", "LLR", 
+    "LNG", "LP", "LPE", "LPX", "LPZ", "LT", "LTC", "LTH", "LWB", "MAA", "MAB", "MAC", "MAE", "MAF", "MAS", 
+    "MBA", "MBB", "MBC", "MBE", "MBL", "MBM", "MBO", "MBR", "MBS", "MBT", "MCB", "MCD", "MCE", "MCF", "MCL", 
+    "MCN", "MCS", "MCT", "MCX", "MDB", "MDD", "MDZ", "ME", "MEB", "MEE", "MEF", "MEO", "MES", "MET", "MEW", 
+    "MFB", "MFC", "MFD", "MFP", "MFR", "MGB", "MGC", "MGF", "MGH", "MGN", "MGO", "MGS", "MGT", "MH", "MHE", 
+    "MHG", "MHO", "MIA", "MIB", "MIP", "MIR", "MJB", "MJC", "MJN", "MJP", "MKC", "MM", "MMC", "MMF", "MMO", 
+    "MMP", "MMR", "MNB", "MNC", "MNG", "MNH", "MNQ", "MNS", "MNT", "MO", "MOA", "MOI", "MOX", "MPA", "MPC", 
+    "MPE", "MPP", "MPS", "MPX", "MQ", "MQA", "MRB", "MRI", "MRT", "MSB", "MSC", "MSD", "MSF", "MSG", "MTB", 
+    "MTF", "MTH", "MTI", "MTS", "MUD", "MX", "MXB", "MXR", "MYB", "MYM", "NBB", "NBD", "NBO", "NBP", "NBY", 
+    "NCB", "NCD", "NCO", "NCP", "NDA", "NEO", "NEP", "NFC", "NFD", "NFG", "NFO", "NG", "NGO", "NGT", "NHH", 
+    "NHO", "NHP", "NIB", "NIE", "NIT", "NIY", "NKD", "NKT", "NLS", "NMO", "NMP", "NN", "NNE", "NNP", "NNT", 
+    "NOB", "NOD", "NOI", "NOK", "NOL", "NON", "NOO", "NOT", "NPG", "NQ", "NQQ", "NQT", "NQX", "NRO", "NRP", 
+    "NRR", "NSO", "NSP", "NSS", "NTP", "NTU", "NTW", "NUB", "NWM", "NWO", "NWP", "NYF", "NYG", "NYM", "NYP", 
+    "NYW", "OAD", "OFF", "OMM", "OMN", "OOD", "OPF", "OPO", "PA", "PAC", "PAL", "PAM", "PAT", "PAU", "PBO", 
+    "PBP", "PCO", "PCP", "PDJ", "PDL", "PEL", "PEX", "PFO", "PFP", "PGG", "PHF", "PHO", "PHP", "PJY", "PKP", 
+    "PL", "PLM", "PLN", "PLO", "PLP", "PLT", "PMF", "PMO", "PMP", "PNF", "PNL", "POC", "POG", "POL", "PPL", 
+    "PPP", "PPW", "PQO", "PQP", "PRK", "PRO", "PRP", "PSF", "PSO", "PSP", "PTL", "PTO", "PUO", "PUP", "PVO", 
+    "PVP", "PWL", "PXO", "PXP", "PYO", "PYP", "PZO", "PZP", "QC", "QCC", "QCN", "QCW", "QG", "QH", "QI", 
+    "QKC", "QM", "QO", "QU", "RB", "RBB", "RBF", "RBL", "RBM", "RBT", "RDA", "RET", "REX", "RF", "RFD", 
+    "RFI", "RGF", "RGI", "RGT", "RHB", "RHS", "RKA", "RKT", "RLT", "RLX", "RMB", "RME", "RP", "RSD", "RSG", 
+    "RSI", "RSV", "RT", "RTQ", "RTX", "RTY", "RVR", "RVT", "RX", "RY", "SAS", "SBM", "SBT", "SCF", "SCT", 
+    "SD", "SDA", "SDD", "SDG", "SDI", "SE", "SEK", "SFB", "SFR", "SG", "SGB", "SGC", "SGF", "SGG", "SGO", 
+    "SGT", "SGU", "SHR", "SI", "SIL", "SIR", "SIT", "SJY", "SMC", "SMT", "SMU", "SOM", "SON", "SOT", "SOX", 
+    "SRB", "SRT", "SSP", "STI", "STR", "STS", "STT", "STY", "SU", "SUT", "SWT", "SXB", "SXI", "SXO", "SXR", 
+    "SXT", "TAF", "TBK", "TBM", "TBT", "TCS", "TDM", "TEF", "TEX", "TFB", "TFU", "TFY", "TH", "THB", "THD", 
+    "THN", "THW", "TIE", "TIL", "TIO", "TK", "TKB", "TL", "TLB", "TLD", "TM", "TMB", "TMD", "TN", "TNA", 
+    "TNT", "TOB", "TOF", "TOU", "TOW", "TOX", "TPB", "TPD", "TPT", "TPY", "TRB", "TRI", "TRL", "TRW", "TT", 
+    "TTB", "TTD", "TTE", "TTF", "TTG", "TTI", "TTW", "TUB", "TUF", "TUL", "TUN", "TUT", "TUX", "TVA", "TW", 
+    "TWB", "TWE", "TWU", "TWW", "TYA", "TYT", "TYW", "TYX", "UA", "UB", "UBA", "UBB", "UBT", "UCE", "UCM", 
+    "UCR", "UCS", "UDL", "UFB", "UFE", "UFV", "UKG", "ULB", "UME", "UN", "UNO", "UPB", "UPM", "UPN", "UQN", 
+    "UR", "URN", "USC", "USE", "USG", "UTA", "UTB", "UTN", "UUN", "UV", "UVN", "UWN", "UX", "UYN", "VDL", 
+    "VR", "VV", "WBR", "WBX", "WCH", "WDB", "WDC", "WHB", "WHD", "WHT", "WMB", "WMD", "WMK", "WMR", "WNC", 
+    "WNT", "WOL", "WPL", "WS", "WTB", "WTD", "WTI", "WTL", "WTT", "XAB", "XAE", "XAF", "XAI", "XAK", "XAP", 
+    "XAR", "XAU", "XAV", "XAY", "XAZ", "XBT", "XC", "XER", "XET", "XFT", "XIT", "XK", "XKT", "XPP", "XPT", 
+    "XRT", "XUB", "XUK", "XUT", "XVT", "XW", "XYT", "XZT", "YHE", "YHF", "YIA", "YIB", "YIC", "YID", "YIE", 
+    "YII", "YIL", "YIO", "YIT", "YIW", "YIY", "YM", "YMT", "YMX", "YNO", "YO", "YRP", "YRW", "YUE", "YWE", 
+    "YWF", "YWK", "ZAL", "ZAR", "ZB", "ZBT", "ZBW", "ZC", "ZCT", "ZF", "ZFT", "ZGL", "ZIY", "ZJL", "ZJY", 
+    "ZK", "ZKU", "ZL", "ZLT", "ZM", "ZMT", "ZN", "ZNC", "ZNS", "ZO", "ZQ", "ZR", "ZS", "ZT", "ZTT", 
+    "ZTW", "ZW", "ZWC", "ZWT", "ZXY"
+]
 
-def resolve_gc_contract() -> str:
-    """Resolve GC to its active front-month contract (e.g. GCM5)."""
-    month_codes = {
-        1: "F", 2: "G", 3: "H", 4: "J", 5: "K", 6: "M",
-        7: "N", 8: "Q", 9: "U", 10: "V", 11: "X", 12: "Z"
-    }
-    now = datetime.now(timezone.utc)
-    month = now.month
-    year = now.year
-    code = month_codes[month]
-    short_year = str(year)[-1]
-    return f"GC{code}{short_year}"
+# Define known equity datasets
+EQUITY_DATASETS = {
+    "XNAS.ITCH": "NASDAQ",
+    "XNYS.PILLAR": "NYSE"
+}
+DEFAULT_EQUITY_DATASET = "XNAS.ITCH" # Default to NASDAQ for simple tickers
 
-def resolve_mgc_contract() -> str:
-    """Resolve MGC to its active front-month contract (e.g. MGCM5)."""
-    month_codes = {
-        1: "F", 2: "G", 3: "H", 4: "J", 5: "K", 6: "M",
-        7: "N", 8: "Q", 9: "U", 10: "V", 11: "X", 12: "Z"
-    }
-    now = datetime.now(timezone.utc)
-    month = now.month
-    year = now.year
-    code = month_codes[month]
-    short_year = str(year)[-1]
-    return f"MGCM{short_year}"
+def get_weekend_es_contract():
+    current_date = datetime.now(timezone.utc)
+    year_last_digit = str(current_date.year)[-1]
+    month = current_date.month
+    if 1 <= month <= 3: contract_month_code = "H"
+    elif 4 <= month <= 6: contract_month_code = "M"
+    elif 7 <= month <= 9: contract_month_code = "U"
+    else: contract_month_code = "Z"
+    return f"ES{contract_month_code}{year_last_digit}"
 
-def resolve_symbol_alias(symbol: str) -> str:
-    """
-    Resolve user-facing aliases to correct Databento symbols.
+def resolve_symbol_alias(input_symbol_str: str) -> dict:
+    """Resolves a user-input symbol to a dictionary containing Databento-compatible symbol, dataset, stype_in, and asset_class."""
+    symbol_lower = input_symbol_str.lower()
+    symbol_upper = input_symbol_str.upper()
 
-    - Leaves futures roots (e.g., ES, NQ) untouched for .FUT logic.
-    - Resolves BTC, GC, MGC to active month contracts.
-    """
-    symbol = symbol.upper()
+    # Default dataset and stype for futures
+    futures_dataset = "GLBX.MDP3"
+    futures_stype_in = "continuous"
+    
+    # Default dataset and stype for equities
+    equity_stype_in = "raw_symbol"
 
-    # Let root futures symbols pass through untouched
-    if symbol in {"ES", "MES", "NQ", "MNQ", "RTY", "YM"}:
-        return symbol
+    # Handle ES specifically for weekend/weekday continuous contract
+    if symbol_lower == "es":
+        today = datetime.now(timezone.utc)
+        if today.weekday() < 5: # Weekday (Monday to Friday)
+            return {"input_symbol": input_symbol_str, "db_symbol": "ES.c.0", "dataset": futures_dataset, "stype_in": futures_stype_in, "asset_class": "future"}
+        else: # Weekend (Saturday or Sunday)
+            # For weekend specific contract, stype_in should be raw_symbol as it's not a continuous contract alias
+            return {"input_symbol": input_symbol_str, "db_symbol": get_weekend_es_contract(), "dataset": futures_dataset, "stype_in": "raw_symbol", "asset_class": "future"}
+    
+    # Handle other specific aliases (like BTC, ETH, GC, MGC)
+    if symbol_lower == "btc":
+        # Example, verify actual Databento dataset for crypto if it's not GLBX.MDP3
+        return {"input_symbol": input_symbol_str, "db_symbol": "BTCUSD.CBSE", "dataset": "CBSE.FUTURES", "stype_in": "raw_symbol", "asset_class": "crypto"} 
+    if symbol_lower == "eth":
+        return {"input_symbol": input_symbol_str, "db_symbol": "ETHUSD.CBSE", "dataset": "CBSE.FUTURES", "stype_in": "raw_symbol", "asset_class": "crypto"}
+    if symbol_lower == "gc" or symbol_lower == "gold":
+        return {"input_symbol": input_symbol_str, "db_symbol": "GC.c.0", "dataset": futures_dataset, "stype_in": futures_stype_in, "asset_class": "future"}
+    if symbol_lower == "mgc":
+        return {"input_symbol": input_symbol_str, "db_symbol": "MGC.c.0", "dataset": futures_dataset, "stype_in": futures_stype_in, "asset_class": "future"}
 
-    aliases = {
-        "BTC": resolve_btc_contract(),
-        "GC": resolve_gc_contract(),
-        "MGC": resolve_mgc_contract(),
-    }
+    # Check if the input symbol is one of the known CME futures roots
+    if symbol_upper in ALL_CME_FUTURES_ROOTS:
+        return {"input_symbol": input_symbol_str, "db_symbol": f"{symbol_upper}.c.0", "dataset": futures_dataset, "stype_in": futures_stype_in, "asset_class": "future"}
 
-    return aliases.get(symbol, symbol)
+    # Heuristic for equity symbols (e.g., AAPL, MSFT - typically 1-5 uppercase letters, no numbers, not in futures list)
+    if 1 <= len(symbol_upper) <= 5 and symbol_upper.isalpha() and symbol_upper.isascii():
+        # For now, default to NASDAQ. We can add logic to try NYSE if NASDAQ fails, or allow user to specify.
+        return {"input_symbol": input_symbol_str, "db_symbol": symbol_upper, "dataset": DEFAULT_EQUITY_DATASET, "stype_in": equity_stype_in, "asset_class": "equity"}
+
+    # If no specific alias or futures root match, and it doesn't look like a simple equity ticker,
+    # return the original symbol and assume it's for GLBX.MDP3 with raw_symbol for flexibility.
+    # This allows passing through already correctly formatted Databento symbols for GLBX.MDP3 if needed.
+    return {"input_symbol": input_symbol_str, "db_symbol": symbol_upper, "dataset": futures_dataset, "stype_in": "raw_symbol", "asset_class": "unknown"}
+
+# Example usage (for testing this file directly):
+if __name__ == "__main__":
+    test_symbols = ["ES", "es", "BTC", "eth", "GC", "gold", "MGC", "NQ", "CL", "ZB", "EUR", "AAPL", "MSFT", "GOOGL", "BRK.A", "INVALID", "AAK", "ZXY", "ESM5"] 
+    print("Testing symbol resolution (weekend logic depends on actual current date):")
+    for sym_test in test_symbols:
+        resolved_info = resolve_symbol_alias(sym_test)
+        print(f"Input: {sym_test:<10} -> Resolved: {resolved_info}")
+    
+    print("\nTo test ES weekend logic, ensure you run this on a Saturday or Sunday, or temporarily modify get_weekend_es_contract for testing.")
+

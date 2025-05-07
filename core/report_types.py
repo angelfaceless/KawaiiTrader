@@ -32,4 +32,6 @@ class Report:
     chart_path: Optional[str]
     targets: List[Target]
     manipulations: List[ManipulationEvent]
-    retracements: List[Retracement]  # ✅ NEW: For IRZ retracement levels
+    retracements: List[Retracement]  # ✅ For IRZ retracement levels
+    current_price: Optional[float] = None              # ✅ NEW
+    current_price_time: Optional[str] = None           # ✅ NEW

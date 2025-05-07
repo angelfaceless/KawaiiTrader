@@ -1,7 +1,0 @@
-python-telegram-bot==20.6
-python-dotenv
-matplotlib
-pandas
-numpy
-requests
-databento

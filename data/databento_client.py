@@ -15,8 +15,8 @@ TIMEFRAME_MAP = {
     "1min": "1min",
     "5min": "5min",
     "15min": "15min",
-    "1h": "1H",
-    "4h": "4H",
+    "1h": "1h",
+    "4h": "4h",
     "1d": "1D",
     "1w": "1W",
     "1month": "1M"

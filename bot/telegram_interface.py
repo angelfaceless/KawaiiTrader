@@ -3,7 +3,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import asyncio
 from dotenv import load_dotenv
-from telegram import Update
+from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
 from core.analyzer import run_analysis
@@ -44,7 +44,10 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         for symbol in symbols:
             for tf in timeframes:
-                await update.message.reply_text(f"🌸 Running report for *{symbol.get('input_symbol', symbol.get('db_symbol', '???'))}* @ `{tf}`...", parse_mode="Markdown")
+                await update.message.reply_text(
+                    f"🌸 Running report for *{symbol.get('input_symbol', symbol.get('db_symbol', '???'))}* @ `{tf}`...",
+                    parse_mode="Markdown"
+                )
 
                 report_obj = run_analysis(symbol_details=symbol, timeframe=tf)
                 report_text = format_report_markdown(report_obj)
@@ -54,11 +57,27 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 with open(report_obj.chart_path, "rb") as chart_file:
                     await context.bot.send_photo(chat_id=update.effective_chat.id, photo=chart_file)
 
+                # 🧠 Dynamic next timeframe suggestion
+                next_tf_map = {
+                    "15min": "1h",
+                    "1h": "4h",
+                    "4h": "1d",
+                    "1d": "1w",
+                    "1w": "1mo",
+                    "1mo": "1mo"
+                }
+                suggested_tf = next_tf_map.get(tf, "1h")
+                keyboard = [[f"/report {symbol.get('input_symbol')} {suggested_tf}"]]
+                reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
+                await update.message.reply_text("Done! Tap below for the next timeframe:", reply_markup=reply_markup)
+
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {e}")
 
 if __name__ == "__main__":
-    if not asyncio.get_event_loop_policy().get_event_loop().is_running():
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
         asyncio.set_event_loop(asyncio.new_event_loop())
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()

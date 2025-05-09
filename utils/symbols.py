@@ -1,8 +1,6 @@
 from datetime import datetime, timezone
 
-# This list contains all the CME Globex MDP3 futures roots
-ALL_CME_FUTURES_ROOTS = [
-    "AAK", "ABH", "ABI", "ABS", "ABT", "ABX", "ABY", "ACB", "ACD", "ADB", "ADE", "ADJ", "ADR", "ADT", "AEB", 
+ALL_CME_FUTURES_ROOTS = [  "AAK", "ABH", "ABI", "ABS", "ABT", "ABX", "ABY", "ACB", "ACD", "ADB", "ADE", "ADJ", "ADR", "ADT", "AEB", 
     "AEP", "AET", "AEZ", "AFE", "AFF", "AFH", "AFI", "AFK", "AFR", "AFT", "AFY", "AGA", "AGE", "AGF", "AGT", 
     "AGX", "AHJ", "AHL", "AHM", "AJ", "AJB", "AJJ", "AJL", "AJR", "AJS", "AJY", "AKL", "AKR", "AKS", "AKX", 
     "AKZ", "ALA", "ALB", "ALI", "ALM", "ALX", "ALY", "AML", "ANC", "ANE", "ANL", "ANT", "AOB", "AOH", "AOJ", 
@@ -71,15 +69,13 @@ ALL_CME_FUTURES_ROOTS = [
     "YII", "YIL", "YIO", "YIT", "YIW", "YIY", "YM", "YMT", "YMX", "YNO", "YO", "YRP", "YRW", "YUE", "YWE", 
     "YWF", "YWK", "ZAL", "ZAR", "ZB", "ZBT", "ZBW", "ZC", "ZCT", "ZF", "ZFT", "ZGL", "ZIY", "ZJL", "ZJY", 
     "ZK", "ZKU", "ZL", "ZLT", "ZM", "ZMT", "ZN", "ZNC", "ZNS", "ZO", "ZQ", "ZR", "ZS", "ZT", "ZTT", 
-    "ZTW", "ZW", "ZWC", "ZWT", "ZXY"
-]
+    "ZTW", "ZW", "ZWC", "ZWT", "ZXY"]
 
-# Define known equity datasets
 EQUITY_DATASETS = {
     "XNAS.ITCH": "NASDAQ",
     "XNYS.PILLAR": "NYSE"
 }
-DEFAULT_EQUITY_DATASET = "XNAS.ITCH" # Default to NASDAQ for simple tickers
+DEFAULT_EQUITY_DATASET = "XNAS.ITCH"
 
 def get_weekend_es_contract():
     current_date = datetime.now(timezone.utc)
@@ -92,58 +88,54 @@ def get_weekend_es_contract():
     return f"ES{contract_month_code}{year_last_digit}"
 
 def resolve_symbol_alias(input_symbol_str: str) -> dict:
-    """Resolves a user-input symbol to a dictionary containing Databento-compatible symbol, dataset, stype_in, and asset_class."""
     symbol_lower = input_symbol_str.lower()
     symbol_upper = input_symbol_str.upper()
 
-    # Default dataset and stype for futures
     futures_dataset = "GLBX.MDP3"
     futures_stype_in = "continuous"
-    
-    # Default dataset and stype for equities
     equity_stype_in = "raw_symbol"
 
-    # Handle ES specifically for weekend/weekday continuous contract
     if symbol_lower == "es":
         today = datetime.now(timezone.utc)
-        if today.weekday() < 5: # Weekday (Monday to Friday)
-            return {"input_symbol": input_symbol_str, "db_symbol": "ES.c.0", "dataset": futures_dataset, "stype_in": futures_stype_in, "asset_class": "future"}
-        else: # Weekend (Saturday or Sunday)
-            # For weekend specific contract, stype_in should be raw_symbol as it's not a continuous contract alias
-            return {"input_symbol": input_symbol_str, "db_symbol": get_weekend_es_contract(), "dataset": futures_dataset, "stype_in": "raw_symbol", "asset_class": "future"}
-    
-    # Handle other specific aliases (like BTC, ETH, GC, MGC)
-    if symbol_lower == "btc":
-        # Example, verify actual Databento dataset for crypto if it's not GLBX.MDP3
-        return {"input_symbol": input_symbol_str, "db_symbol": "BTCUSD.CBSE", "dataset": "CBSE.FUTURES", "stype_in": "raw_symbol", "asset_class": "crypto"} 
-    if symbol_lower == "eth":
-        return {"input_symbol": input_symbol_str, "db_symbol": "ETHUSD.CBSE", "dataset": "CBSE.FUTURES", "stype_in": "raw_symbol", "asset_class": "crypto"}
-    if symbol_lower == "gc" or symbol_lower == "gold":
-        return {"input_symbol": input_symbol_str, "db_symbol": "GC.c.0", "dataset": futures_dataset, "stype_in": futures_stype_in, "asset_class": "future"}
-    if symbol_lower == "mgc":
-        return {"input_symbol": input_symbol_str, "db_symbol": "MGC.c.0", "dataset": futures_dataset, "stype_in": futures_stype_in, "asset_class": "future"}
+        if today.weekday() < 5:
+            return {
+                "input_symbol": input_symbol_str,
+                "db_symbol": "ES.c.0",
+                "dataset": futures_dataset,
+                "stype_in": futures_stype_in,
+                "asset_class": "future"
+            }
+        else:
+            return {
+                "input_symbol": input_symbol_str,
+                "db_symbol": get_weekend_es_contract(),
+                "dataset": futures_dataset,
+                "stype_in": "raw_symbol",
+                "asset_class": "future"
+            }
 
-    # Check if the input symbol is one of the known CME futures roots
     if symbol_upper in ALL_CME_FUTURES_ROOTS:
-        return {"input_symbol": input_symbol_str, "db_symbol": f"{symbol_upper}.c.0", "dataset": futures_dataset, "stype_in": futures_stype_in, "asset_class": "future"}
+        return {
+            "input_symbol": input_symbol_str,
+            "db_symbol": f"{symbol_upper}.c.0",
+            "dataset": futures_dataset,
+            "stype_in": futures_stype_in,
+            "asset_class": "future"
+        }
 
-    # Heuristic for equity symbols (e.g., AAPL, MSFT - typically 1-5 uppercase letters, no numbers, not in futures list)
     if 1 <= len(symbol_upper) <= 5 and symbol_upper.isalpha() and symbol_upper.isascii():
-        # For now, default to NASDAQ. We can add logic to try NYSE if NASDAQ fails, or allow user to specify.
-        return {"input_symbol": input_symbol_str, "db_symbol": symbol_upper, "dataset": DEFAULT_EQUITY_DATASET, "stype_in": equity_stype_in, "asset_class": "equity"}
+        return {
+            "input_symbol": input_symbol_str,
+            "db_symbol": symbol_upper,
+            "dataset": DEFAULT_EQUITY_DATASET,
+            "stype_in": equity_stype_in,
+            "asset_class": "equity"
+        }
 
-    # If no specific alias or futures root match, and it doesn't look like a simple equity ticker,
-    # return the original symbol and assume it's for GLBX.MDP3 with raw_symbol for flexibility.
-    # This allows passing through already correctly formatted Databento symbols for GLBX.MDP3 if needed.
-    return {"input_symbol": input_symbol_str, "db_symbol": symbol_upper, "dataset": futures_dataset, "stype_in": "raw_symbol", "asset_class": "unknown"}
-
-# Example usage (for testing this file directly):
-if __name__ == "__main__":
-    test_symbols = ["ES", "es", "BTC", "eth", "GC", "gold", "MGC", "NQ", "CL", "ZB", "EUR", "AAPL", "MSFT", "GOOGL", "BRK.A", "INVALID", "AAK", "ZXY", "ESM5"] 
-    print("Testing symbol resolution (weekend logic depends on actual current date):")
-    for sym_test in test_symbols:
-        resolved_info = resolve_symbol_alias(sym_test)
-        print(f"Input: {sym_test:<10} -> Resolved: {resolved_info}")
-    
-    print("\nTo test ES weekend logic, ensure you run this on a Saturday or Sunday, or temporarily modify get_weekend_es_contract for testing.")
-
+    return {
+        "input_symbol": input_symbol_str,
+        "db_symbol": symbol_upper,
+        "dataset": futures_dataset,
+        "stype_in": "raw_symbol",
+        "asset_class": "unknown"
+    }

@@ -1,83 +1,133 @@
 import pandas as pd
+import numpy as np
 
 def detect_manipulation(df: pd.DataFrame, range_info: dict) -> dict:
     """
-    Detects if price wicked above/below a range and returned inside it.
-    Works with real-time or historical data. Tracks status:
-    - 'manipulated': broke and returned ✅
-    - 'awaiting_return': broke, still outside ⏳
-    - 'clean': no breakout ⬜
+    Detects the single most extreme manipulation event over the last 300 candles.
+    A manipulation event involves price breaking out of a defined range and then returning inside.
+    The "most extreme" is the candle with the close price furthest from the breached range boundary.
     """
+    if df is None or df.empty:
+        return {
+            "manipulated": False, "returned_to_range": False, "direction": None,
+            "status": "clean", "message": "Input DataFrame is empty.",
+            "timestamp": None, "price": None
+        }
+
+    df_proc = df.copy().tail(300) # Process the last 300 candles as per user requirement
+    df_proc.columns = [str(col).lower() for col in df_proc.columns]
+
+    if not all(col in df_proc.columns for col in ['close']):
+        return {
+            "manipulated": False, "returned_to_range": False, "direction": None,
+            "status": "error", "message": "DataFrame missing required 'close' column.",
+            "timestamp": None, "price": None
+        }
+
+    if 'range_low' not in range_info or 'range_high' not in range_info or \
+       pd.isna(range_info['range_low']) or pd.isna(range_info['range_high']):
+        return {
+            "manipulated": False, "returned_to_range": False, "direction": None,
+            "status": "clean", "message": "Valid range_low and range_high not provided in range_info.",
+            "timestamp": None, "price": None
+        }
 
     range_low = range_info["range_low"]
     range_high = range_info["range_high"]
-    window = range_info.get("window", 50)  # how many bars formed the range
 
-    # Normalize index/columns
-    df = df.reset_index()
-    df.columns = df.columns.str.lower()
+    overall_most_extreme_candle_details = None
+    overall_max_deviation = 0.0
 
-    # Only look at candles that came after the consolidation
-    post_range_df = df.iloc[-(len(df) - window):]
+    in_breakout_sequence = False
+    current_sequence_direction = None
+    current_sequence_extreme_candle_timestamp = None
+    current_sequence_extreme_candle_close = None
+    current_sequence_max_deviation = 0.0
 
-    direction = None
-    breakout_idx = None
-    returned_to_range = False
-    manipulated = False
+    for timestamp, candle_row in df_proc.iterrows():
+        close_price = candle_row["close"]
 
-    # Step 1: Did we break above or below?
-    for i, row in post_range_df.iterrows():
-        if row["high"] > range_high:
-            direction = "up"
-            breakout_idx = i
-            break
-        elif row["low"] < range_low:
-            direction = "down"
-            breakout_idx = i
-            break
+        if not in_breakout_sequence:
+            if close_price > range_high:
+                in_breakout_sequence = True
+                current_sequence_direction = "up"
+                current_sequence_max_deviation = close_price - range_high
+                current_sequence_extreme_candle_timestamp = timestamp
+                current_sequence_extreme_candle_close = close_price
+            elif close_price < range_low:
+                in_breakout_sequence = True
+                current_sequence_direction = "down"
+                current_sequence_max_deviation = range_low - close_price
+                current_sequence_extreme_candle_timestamp = timestamp
+                current_sequence_extreme_candle_close = close_price
+        else:  # We are in a breakout sequence
+            if current_sequence_direction == "up":
+                if close_price > range_high:  # Still outside (above)
+                    deviation = close_price - range_high
+                    if deviation > current_sequence_max_deviation:
+                        current_sequence_max_deviation = deviation
+                        current_sequence_extreme_candle_timestamp = timestamp
+                        current_sequence_extreme_candle_close = close_price
+                elif close_price < range_low:  # Crossed down through the range, new breakout sequence
+                    # UP sequence ended without returning *inside*. Start new DOWN sequence.
+                    in_breakout_sequence = True # Remains true, but for a new sequence
+                    current_sequence_direction = "down"
+                    current_sequence_max_deviation = range_low - close_price
+                    current_sequence_extreme_candle_timestamp = timestamp
+                    current_sequence_extreme_candle_close = close_price
+                elif range_low <= close_price <= range_high:  # Returned to inside the range
+                    if current_sequence_max_deviation > overall_max_deviation:
+                        overall_max_deviation = current_sequence_max_deviation
+                        overall_most_extreme_candle_details = {
+                            "timestamp": current_sequence_extreme_candle_timestamp,
+                            "price": current_sequence_extreme_candle_close,
+                            "direction": "up"
+                        }
+                    in_breakout_sequence = False # Reset for next potential breakout
+                # else: price is still outside but not more extreme, or within range but not a full return (e.g. on boundary)
 
-    # Step 2: After breakout, did we return?
-    if direction and breakout_idx is not None:
-        subsequent = post_range_df.loc[breakout_idx:]
-        for _, row in subsequent.iterrows():
-            if range_low <= row["close"] <= range_high:
-                returned_to_range = True
-                manipulated = True
-                break
-
-    # Final result
-    if manipulated:
-        status = "manipulated"
-        msg = f"🟨 Manipulation detected — price broke {direction} and returned into the range."
-    elif direction:
-        status = "awaiting_return"
-        msg = f"🟧 Breakout detected {direction} but price has NOT returned into the range yet."
+            elif current_sequence_direction == "down":
+                if close_price < range_low:  # Still outside (below)
+                    deviation = range_low - close_price
+                    if deviation > current_sequence_max_deviation:
+                        current_sequence_max_deviation = deviation
+                        current_sequence_extreme_candle_timestamp = timestamp
+                        current_sequence_extreme_candle_close = close_price
+                elif close_price > range_high:  # Crossed up through the range, new breakout sequence
+                    # DOWN sequence ended without returning *inside*. Start new UP sequence.
+                    in_breakout_sequence = True # Remains true, but for a new sequence
+                    current_sequence_direction = "up"
+                    current_sequence_max_deviation = close_price - range_high
+                    current_sequence_extreme_candle_timestamp = timestamp
+                    current_sequence_extreme_candle_close = close_price
+                elif range_low <= close_price <= range_high:  # Returned to inside the range
+                    if current_sequence_max_deviation > overall_max_deviation:
+                        overall_max_deviation = current_sequence_max_deviation
+                        overall_most_extreme_candle_details = {
+                            "timestamp": current_sequence_extreme_candle_timestamp,
+                            "price": current_sequence_extreme_candle_close,
+                            "direction": "down"
+                        }
+                    in_breakout_sequence = False # Reset for next potential breakout
+    
+    if overall_most_extreme_candle_details:
+        return {
+            "manipulated": True,
+            "returned_to_range": True, 
+            "direction": overall_most_extreme_candle_details["direction"],
+            "status": "manipulated",
+            "message": f"🟨 Manipulation detected. Most extreme close ({overall_most_extreme_candle_details['price']:.2f}) occurred during a breakout {overall_most_extreme_candle_details['direction']}.",
+            "timestamp": pd.to_datetime(overall_most_extreme_candle_details["timestamp"]),
+            "price": overall_most_extreme_candle_details["price"]
+        }
     else:
-        status = "clean"
-        msg = "No manipulation detected."
+        return {
+            "manipulated": False,
+            "returned_to_range": False,
+            "direction": None,
+            "status": "clean",
+            "message": "No manipulation (breakout and return with an extreme candle) detected in the last 300 candles.",
+            "timestamp": None,
+            "price": None
+        }
 
-    result = {
-        "manipulated": manipulated,
-        "returned_to_range": returned_to_range,
-        "direction": direction,
-        "status": status,
-        "message": msg,
-    }
-
-    # ✅ Only add price + timestamp if there was a breakout
-    if direction and breakout_idx is not None:
-        breakout_row = post_range_df.loc[breakout_idx]
-        result["price"] = breakout_row["high"] if direction == "up" else breakout_row["low"]
-
-        # Robust timestamp extraction
-        timestamp = None
-        if "ts_event" in breakout_row:
-            timestamp = pd.to_datetime(breakout_row["ts_event"])
-        elif "timestamp" in breakout_row:
-            timestamp = pd.to_datetime(breakout_row["timestamp"])
-        else:
-            timestamp = pd.to_datetime(breakout_row.name) if post_range_df.index.name else pd.NaT
-
-        result["timestamp"] = timestamp
-
-    return result

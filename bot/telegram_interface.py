@@ -59,6 +59,8 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
                 # 🧠 Dynamic next timeframe suggestion
                 next_tf_map = {
+                    "1min": "5min", 
+                    "5min": "15min",
                     "15min": "1h",
                     "1h": "4h",
                     "4h": "1d",

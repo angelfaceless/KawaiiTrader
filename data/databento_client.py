@@ -1,5 +1,3 @@
-# data/databento_client.py
-
 import os
 import math
 import pandas as pd
@@ -19,7 +17,8 @@ TIMEFRAME_MAP = {
     "4h": "4h",
     "1d": "1D",
     "1w": "1W",
-    "1month": "1M"
+    "1month": "1M",
+    "1mo": "1M"
 }
 
 TIMEFRAME_SECONDS = {
@@ -47,7 +46,7 @@ def get_dynamic_lookback(timeframe: str, target_candles: int = None) -> int:
         return 100
     elif timeframe == "1w":
         return 100
-    elif timeframe == "1month":
+    elif timeframe == "1month" or timeframe == "1mo":
         return 360
     return 7
 
@@ -157,7 +156,18 @@ def fetch_ohlcv(symbol_details: dict, timeframe: str, lookback_days: int = None)
         if not isinstance(df.index, pd.DatetimeIndex):
             raise ValueError("Expected OHLCV/trade data to have a DatetimeIndex.")
 
-        if timeframe != "1s":
+        # Handle 1mo separately: resample from daily
+        if timeframe == "1mo":
+            df = df.resample("1M").agg({
+                "open": "first",
+                "high": "max",
+                "low": "min",
+                "close": "last",
+                "volume": "sum"
+            }).dropna(subset=["open", "high", "low", "close"], how="all")
+            df["volume"] = df["volume"].fillna(0)
+
+        elif timeframe != "1s":
             rule = TIMEFRAME_MAP.get(timeframe)
             if not rule:
                 raise ValueError(f"Unsupported timeframe for resampling: {timeframe}")

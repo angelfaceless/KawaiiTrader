@@ -72,10 +72,8 @@ def fetch_ohlcv(symbol_details: dict, timeframe: str, lookback_days: int = None)
         end_time = end_time.replace(hour=21, minute=0)
 
     if lookback_days is None:
-        if timeframe in ["1d", "1w", "1month"]:
-            lookback_days = 365
-        else:
-            lookback_days = get_dynamic_lookback(timeframe)
+        lookback_days = get_dynamic_lookback(timeframe)
+    lookback_days = min(lookback_days, 365)
 
     start_time = end_time - timedelta(days=lookback_days)
 

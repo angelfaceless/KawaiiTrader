@@ -62,7 +62,15 @@ def fetch_ohlcv(symbol_details: dict, timeframe: str, lookback_days: int = None)
     db_stype_in = symbol_details["stype_in"]
     asset_class = symbol_details.get("asset_class", "unknown")
 
+    # 🌐 Calculate end_time with weekend awareness
     end_time = datetime.now(timezone.utc).replace(second=0, microsecond=0) - timedelta(minutes=12)
+    if end_time.weekday() == 5:  # Saturday
+        end_time -= timedelta(days=1)
+        end_time = end_time.replace(hour=21, minute=0)
+    elif end_time.weekday() == 6:  # Sunday
+        end_time -= timedelta(days=2)
+        end_time = end_time.replace(hour=21, minute=0)
+
     if lookback_days is None:
         lookback_days = get_dynamic_lookback(timeframe)
     start_time = end_time - timedelta(days=lookback_days)

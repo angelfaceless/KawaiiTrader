@@ -72,9 +72,14 @@ def fetch_ohlcv(symbol_details: dict, timeframe: str, lookback_days: int = None)
         end_time = end_time.replace(hour=21, minute=0)
 
     if lookback_days is None:
-        lookback_days = get_dynamic_lookback(timeframe)
+        if timeframe in ["1d", "1w", "1month"]:
+            lookback_days = 365
+        else:
+            lookback_days = get_dynamic_lookback(timeframe)
+
     start_time = end_time - timedelta(days=lookback_days)
 
+    print(f"[DEBUG] {db_symbol} @ {timeframe} | Start: {start_time}, End: {end_time} | Lookback: {lookback_days} days")
     sys.stdout.flush()
 
     df = pd.DataFrame()

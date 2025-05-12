@@ -33,20 +33,24 @@ TIMEFRAME_SECONDS = {
 }
 
 def get_dynamic_lookback(timeframe: str, target_candles: int = None) -> int:
+    # Hardcoded overrides
+    if timeframe in ["5min", "15min"]:
+        return 4
+    if timeframe == "1min":
+        return 3
+
     if target_candles is not None:
         seconds = TIMEFRAME_SECONDS.get(timeframe)
         if seconds:
             return max(1, math.ceil((target_candles * seconds) / 86400))
 
-    if timeframe in ["1min", "5min", "15min"]:
-        return 2
-    elif timeframe in ["1h", "4h"]:
+    if timeframe in ["1h", "4h"]:
         return 15
-    elif timeframe == "1d":
+    if timeframe == "1d":
         return 100
-    elif timeframe == "1w":
+    if timeframe == "1w":
         return 100
-    elif timeframe == "1month" or timeframe == "1mo":
+    if timeframe in ["1month", "1mo"]:
         return 360
     return 7
 
@@ -61,12 +65,11 @@ def fetch_ohlcv(symbol_details: dict, timeframe: str, lookback_days: int = None)
     db_stype_in = symbol_details["stype_in"]
     asset_class = symbol_details.get("asset_class", "unknown")
 
-    # 🌐 Calculate end_time with weekend awareness
     end_time = datetime.now(timezone.utc).replace(second=0, microsecond=0) - timedelta(minutes=12)
-    if end_time.weekday() == 5:  # Saturday
+    if end_time.weekday() == 5:
         end_time -= timedelta(days=1)
         end_time = end_time.replace(hour=21, minute=0)
-    elif end_time.weekday() == 6:  # Sunday
+    elif end_time.weekday() == 6:
         end_time -= timedelta(days=2)
         end_time = end_time.replace(hour=21, minute=0)
 
@@ -156,7 +159,6 @@ def fetch_ohlcv(symbol_details: dict, timeframe: str, lookback_days: int = None)
         if not isinstance(df.index, pd.DatetimeIndex):
             raise ValueError("Expected OHLCV/trade data to have a DatetimeIndex.")
 
-        # Handle 1mo separately: resample from daily
         if timeframe == "1mo":
             df = df.resample("1M").agg({
                 "open": "first",

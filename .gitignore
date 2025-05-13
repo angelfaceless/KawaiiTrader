@@ -1,5 +1,21 @@
-.env
+# Ignore virtual environment
+venv/
 .venv/
+
+# Ignore compiled Python files
 __pycache__/
-*.pyc
-Charts/
+*.py[cod]
+*.so
+
+# Ignore logs
+*.log
+
+# Ignore environment files
+.env
+
+# Ignore Jupyter notebooks checkpoint files
+.ipynb_checkpoints/
+
+# Ignore MacOS system files
+.DS_Store
+

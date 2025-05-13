@@ -1,0 +1,20 @@
+[0;1;32m●[0m kawaii_bot.service - KawaiiTrader Telegram Bot
+     Loaded: loaded (]8;;file://KawaiiTraderCloud/etc/systemd/system/kawaii_bot.service/etc/systemd/system/kawaii_bot.service]8;;; [0;1;32menabled[0m; preset: [0;1;32menabled[0m)
+     Active: [0;1;32mactive (running)[0m since Tue 2025-05-13 04:16:44 UTC; 8h ago
+   Main PID: 17079 (python)
+      Tasks: 9 (limit: 9258)
+     Memory: 126.3M (peak: 127.3M)
+        CPU: 9.102s
+     CGroup: /system.slice/kawaii_bot.service
+             └─[0;38;5;245m17079 /root/kawaiitrader/venv/bin/python bot/telegram_interface.py[0m
+
+May 13 12:21:00 KawaiiTraderCloud python[17079]:            ^^^^^^^^^^^^^^^^^^^^^^^
+May 13 12:21:00 KawaiiTraderCloud python[17079]:   File "/root/kawaiitrader/venv/lib/python3.12/site-packages/telegram/_bot.py", line 635, in _do_post
+May 13 12:21:00 KawaiiTraderCloud python[17079]:     return await request.post(
+May 13 12:21:00 KawaiiTraderCloud python[17079]:            ^^^^^^^^^^^^^^^^^^^
+May 13 12:21:00 KawaiiTraderCloud python[17079]:   File "/root/kawaiitrader/venv/lib/python3.12/site-packages/telegram/request/_baserequest.py", line 168, in post
+May 13 12:21:00 KawaiiTraderCloud python[17079]:     result = await self._request_wrapper(
+May 13 12:21:00 KawaiiTraderCloud python[17079]:              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+May 13 12:21:00 KawaiiTraderCloud python[17079]:   File "/root/kawaiitrader/venv/lib/python3.12/site-packages/telegram/request/_baserequest.py", line 327, in _request_wrapper
+May 13 12:21:00 KawaiiTraderCloud python[17079]:     raise Conflict(message)
+May 13 12:21:00 KawaiiTraderCloud python[17079]: telegram.error.Conflict: Conflict: terminated by other getUpdates request; make sure that only one bot instance is running

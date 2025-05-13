@@ -1,0 +1,62 @@
+import re
+
+def escape_discord(text: str) -> str:
+    """
+    Escapes Discord markdown characters that can interfere with formatting.
+    """
+    escape_chars = r"[*_`~|>]"
+    return re.sub(escape_chars, lambda m: f"\\{m.group(0)}", text)
+
+def format_report_discord(report) -> str:
+    """
+    Formats the Report object for Discord output using markdown-safe text.
+    """
+    lines = []
+
+    # Header
+    lines.append(f"**{report.symbol} – {report.timeframe} Report**")
+    lines.append(f"📌 Current Price: {report.current_price} on {report.timestamp_est}")
+    lines.append("")
+
+    # Bias and Range
+    lines.append(f"**Bias:** {escape_discord(report.bias)}")
+    lines.append(f"**Range:** {report.range_low} – {report.range_high}")
+    lines.append("")
+
+    # Support/Resistance
+    if report.support_levels:
+        supports = ", ".join(map(str, report.support_levels))
+        lines.append(f"**Support Levels:**\n{supports}")
+        lines.append("")
+    if report.resistance_levels:
+        resistances = ", ".join(map(str, report.resistance_levels))
+        lines.append(f"**Resistance Levels:**\n{resistances}")
+        lines.append("")
+
+    # Trendlines
+    if report.trendline_summary:
+        lines.append(f"**Trendlines:**\n{escape_discord(report.trendline_summary)}")
+        lines.append("")
+
+    # Manipulation
+    if report.manipulations:
+        lines.append("**Manipulation:**")
+        for m in report.manipulations:
+            timestamp = m["timestamp"]
+            desc = escape_discord(m["description"])
+            lines.append(f"{timestamp} — {desc}")
+        lines.append("")
+
+    # IRZ Zone
+    if report.irz_retracement:
+        lines.append("**IRZ Retracement Zone:**")
+        for level in report.irz_retracement:
+            lines.append(f"- {level.label}: {level.price}")
+        lines.append("")
+    if report.irz_targets:
+        lines.append("**🎯 IRZ Levels (projected downward):**" if report.bias == "bearish" else "**🎯 IRZ Levels (projected upward):**")
+        for level in report.irz_targets:
+            lines.append(f"- {level.label}: {level.price}")
+        lines.append("")
+
+    return "\n".join(lines)

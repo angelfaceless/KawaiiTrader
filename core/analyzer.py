@@ -49,7 +49,7 @@ def run_analysis(symbol_details: dict, timeframe: str = "1h") -> Report:
     visible_min = df["low"].min()
     visible_max = df["high"].max()
 
-    for (role, trend), msg in zip(raw_vectors.items(), trendline_data["messages"]):
+    for role, trend in raw_vectors.items():
         clean_key = role.lower().split()[0]
         slope = trend["slope"]
         intercept = trend["intercept"]
@@ -58,23 +58,21 @@ def run_analysis(symbol_details: dict, timeframe: str = "1h") -> Report:
         x_vals = list(range(start_idx, len(df)))
         y_vals = [slope * x + intercept for x in x_vals]
 
-        # Truncate first
-        truncated_msg = truncate_touch_points(msg)
-
-        # Append annotation after truncation
-        if "Touch points:" in truncated_msg:
-            if max(y_vals) < visible_min:
-                truncated_msg += " _(below visible range)_"
-            elif min(y_vals) > visible_max:
-                truncated_msg += " _(above visible range)_"
-
-        annotated_messages.append(truncated_msg)
-
         trendline_vectors[clean_key] = {
             "slope": slope,
             "intercept": intercept,
             "start_index": start_idx
         }
+
+    # 🧠 Append all trendline messages after storing vectors
+    for msg in trendline_data["messages"]:
+        truncated_msg = truncate_touch_points(msg)
+        if "Touch points:" in truncated_msg:
+            if max(y_vals) < visible_min:
+                truncated_msg += " _(below visible range)_"
+            elif min(y_vals) > visible_max:
+                truncated_msg += " _(above visible range)_"
+        annotated_messages.append(truncated_msg)
 
     trendline_summary = "\n".join(annotated_messages)
 

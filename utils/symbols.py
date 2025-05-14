@@ -1,6 +1,10 @@
 from datetime import datetime, timezone
 
-ALL_CME_FUTURES_ROOTS = [  "AAK", "ABH", "ABI", "ABS", "ABT", "ABX", "ABY", "ACB", "ACD", "ADB", "ADE", "ADJ", "ADR", "ADT", "AEB", 
+# CME currency futures that need raw front-month contracts
+CURRENCY_FUTURES = {"6E", "6J", "6B", "6C", "6A", "6N", "6S", "6R", "6Z", "6L", "6M", "6K", "6Y"}
+
+ALL_CME_FUTURES_ROOTS = [
+    "AAK", "ABH", "ABI", "ABS", "ABT", "ABX", "ABY", "ACB", "ACD", "ADB", "ADE", "ADJ", "ADR", "ADT", "AEB", 
     "AEP", "AET", "AEZ", "AFE", "AFF", "AFH", "AFI", "AFK", "AFR", "AFT", "AFY", "AGA", "AGE", "AGF", "AGT", 
     "AGX", "AHJ", "AHL", "AHM", "AJ", "AJB", "AJJ", "AJL", "AJR", "AJS", "AJY", "AKL", "AKR", "AKS", "AKX", 
     "AKZ", "ALA", "ALB", "ALI", "ALM", "ALX", "ALY", "AML", "ANC", "ANE", "ANL", "ANT", "AOB", "AOH", "AOJ", 
@@ -68,8 +72,8 @@ ALL_CME_FUTURES_ROOTS = [  "AAK", "ABH", "ABI", "ABS", "ABT", "ABX", "ABY", "ACB
     "XRT", "XUB", "XUK", "XUT", "XVT", "XW", "XYT", "XZT", "YHE", "YHF", "YIA", "YIB", "YIC", "YID", "YIE", 
     "YII", "YIL", "YIO", "YIT", "YIW", "YIY", "YM", "YMT", "YMX", "YNO", "YO", "YRP", "YRW", "YUE", "YWE", 
     "YWF", "YWK", "ZAL", "ZAR", "ZB", "ZBT", "ZBW", "ZC", "ZCT", "ZF", "ZFT", "ZGL", "ZIY", "ZJL", "ZJY", 
-    "ZK", "ZKU", "ZL", "ZLT", "ZM", "ZMT", "ZN", "ZNC", "ZNS", "ZO", "ZQ", "ZR", "ZS", "ZT", "ZTT", 
-    "ZTW", "ZW", "ZWC", "ZWT", "ZXY"]
+    "ZK", "ZKU", "ZL", "ZLT", "ZM", "ZMT", "ZN", "ZNC", "ZNS", "ZO", "ZQ", "ZR", "ZS", "ZT", "ZTT" 
+] + list(CURRENCY_FUTURES)
 
 EQUITY_DATASETS = {
     "XNAS.ITCH": "NASDAQ",
@@ -77,29 +81,50 @@ EQUITY_DATASETS = {
 }
 DEFAULT_EQUITY_DATASET = "XNAS.ITCH"
 
+
 def get_weekend_es_contract():
     current_date = datetime.now(timezone.utc)
     year_last_digit = str(current_date.year)[-1]
     month = current_date.month
-    if 1 <= month <= 3: contract_month_code = "H"
-    elif 4 <= month <= 6: contract_month_code = "M"
-    elif 7 <= month <= 9: contract_month_code = "U"
-    else: contract_month_code = "Z"
+    if 1 <= month <= 3:
+        contract_month_code = "H"
+    elif 4 <= month <= 6:
+        contract_month_code = "M"
+    elif 7 <= month <= 9:
+        contract_month_code = "U"
+    else:
+        contract_month_code = "Z"
     return f"ES{contract_month_code}{year_last_digit}"
 
+
+def get_front_month_currency_contract(root: str) -> str:
+    """Return the current front-month contract for a given currency future root like '6E'."""
+    now = datetime.now(timezone.utc)
+    year_last_digit = str(now.year)[-1]
+    if 1 <= now.month <= 3:
+        code = "H"
+    elif 4 <= now.month <= 6:
+        code = "M"
+    elif 7 <= now.month <= 9:
+        code = "U"
+    else:
+        code = "Z"
+    return f"{root}{code}{year_last_digit}"
+
+
 def resolve_symbol_alias(input_symbol_str: str) -> dict:
-    symbol_lower = input_symbol_str.lower()
-    symbol_upper = input_symbol_str.upper()
+    symbol = input_symbol_str.strip().upper()
 
     futures_dataset = "GLBX.MDP3"
     futures_stype_in = "continuous"
     equity_stype_in = "raw_symbol"
 
-    if symbol_lower == "es":
+    # Special handling for ES weekend fallback
+    if symbol == "ES":
         today = datetime.now(timezone.utc)
         if today.weekday() < 5:
             return {
-                "input_symbol": input_symbol_str,
+                "input_symbol": symbol,
                 "db_symbol": "ES.c.0",
                 "dataset": futures_dataset,
                 "stype_in": futures_stype_in,
@@ -107,34 +132,48 @@ def resolve_symbol_alias(input_symbol_str: str) -> dict:
             }
         else:
             return {
-                "input_symbol": input_symbol_str,
+                "input_symbol": symbol,
                 "db_symbol": get_weekend_es_contract(),
                 "dataset": futures_dataset,
                 "stype_in": "raw_symbol",
                 "asset_class": "future"
             }
 
-    if symbol_upper in ALL_CME_FUTURES_ROOTS:
+    # 🔁 Currency futures must use raw front-month contracts
+    if symbol in CURRENCY_FUTURES:
+        contract = get_front_month_currency_contract(symbol)
         return {
-            "input_symbol": input_symbol_str,
-            "db_symbol": f"{symbol_upper}.c.0",
+            "input_symbol": symbol,
+            "db_symbol": contract,
+            "dataset": futures_dataset,
+            "stype_in": "raw_symbol",
+            "asset_class": "future"
+        }
+
+    # Normal CME futures
+    if symbol in ALL_CME_FUTURES_ROOTS:
+        return {
+            "input_symbol": symbol,
+            "db_symbol": f"{symbol}.c.0",
             "dataset": futures_dataset,
             "stype_in": futures_stype_in,
             "asset_class": "future"
         }
 
-    if 1 <= len(symbol_upper) <= 5 and symbol_upper.isalpha() and symbol_upper.isascii():
+    # Equities (1–5 letter uppercase alpha)
+    if 1 <= len(symbol) <= 5 and symbol.isalpha() and symbol.isascii():
         return {
-            "input_symbol": input_symbol_str,
-            "db_symbol": symbol_upper,
+            "input_symbol": symbol,
+            "db_symbol": symbol,
             "dataset": DEFAULT_EQUITY_DATASET,
             "stype_in": equity_stype_in,
             "asset_class": "equity"
         }
 
+    # Fallback: unknown type
     return {
-        "input_symbol": input_symbol_str,
-        "db_symbol": symbol_upper,
+        "input_symbol": symbol,
+        "db_symbol": symbol,
         "dataset": futures_dataset,
         "stype_in": "raw_symbol",
         "asset_class": "unknown"

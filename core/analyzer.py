@@ -7,16 +7,26 @@ from core.irz_fib import calculate_irz_projection
 from core.visualizer import plot_full_analysis
 from core.report_types import Report, Target, ManipulationEvent, Retracement
 
-# run_analysis now accepts symbol_details dictionary
+# 🔧 Helper to truncate long touch point lists
+def truncate_touch_points(message: str, max_points: int = 10) -> str:
+    if "Touch points:" not in message:
+        return message
+
+    prefix, points_part = message.split("Touch points:", 1)
+    points = [p.strip() for p in points_part.split(",") if p.strip()]
+    if len(points) <= max_points:
+        return f"{prefix}Touch points: {', '.join(points)}"
+
+    truncated = points[:max_points]
+    return f"{prefix}Touch points: {', '.join(truncated)}... (+{len(points) - max_points} more)"
+
 def run_analysis(symbol_details: dict, timeframe: str = "1h") -> Report:
-    
-    # Use input_symbol for user-facing elements, db_symbol for internal Databento calls (though fetch_ohlcv now handles details)
+
     input_symbol = symbol_details.get("input_symbol", symbol_details.get("db_symbol", "Unknown"))
 
     target_candles = 365 if timeframe == "1d" else 120
     lookback_days = get_dynamic_lookback(timeframe, target_candles=target_candles)
-    
-    # Pass the entire symbol_details dictionary to fetch_ohlcv
+
     df = fetch_ohlcv(symbol_details, timeframe, lookback_days=lookback_days)
 
     if df is None or df.empty:
@@ -25,19 +35,49 @@ def run_analysis(symbol_details: dict, timeframe: str = "1h") -> Report:
     if len(df) < 10:
         print(f"⚠️ Only {len(df)} candles returned for {input_symbol} on {timeframe}")
 
-    # ✅ Extract current price and timestamp
     current_price = float(df["close"].iloc[-1])
     current_price_time = df.index[-1].isoformat()
 
-    # 🟦 Support / Resistance
     supports, resistances = detect_support_resistance(df)
 
-    # 📐 Trendlines
+    # 📐 Trendlines + annotate visibility + truncate
     trendline_data = detect_trendline(df, timeframe, input_symbol)
-    trendline_vectors = trendline_data["vectors"]
-    trendline_summary = "\n".join(trendline_data["messages"])
+    raw_vectors = trendline_data["vectors"]
+    trendline_vectors = {}
+    annotated_messages = []
 
-    # 🟥 Range Detection
+    visible_min = df["low"].min()
+    visible_max = df["high"].max()
+
+    for (role, trend), msg in zip(raw_vectors.items(), trendline_data["messages"]):
+        clean_key = role.lower().split()[0]
+        slope = trend["slope"]
+        intercept = trend["intercept"]
+        start_idx = trend["start_index"]
+
+        x_vals = list(range(start_idx, len(df)))
+        y_vals = [slope * x + intercept for x in x_vals]
+
+        # Truncate first
+        truncated_msg = truncate_touch_points(msg)
+
+        # Append annotation after truncation
+        if "Touch points:" in truncated_msg:
+            if max(y_vals) < visible_min:
+                truncated_msg += " _(below visible range)_"
+            elif min(y_vals) > visible_max:
+                truncated_msg += " _(above visible range)_"
+
+        annotated_messages.append(truncated_msg)
+
+        trendline_vectors[clean_key] = {
+            "slope": slope,
+            "intercept": intercept,
+            "start_index": start_idx
+        }
+
+    trendline_summary = "\n".join(annotated_messages)
+
     range_info = detect_body_range(df, timeframe)
     range_low = range_info.get("range_low")
     range_high = range_info.get("range_high")
@@ -64,10 +104,8 @@ def run_analysis(symbol_details: dict, timeframe: str = "1h") -> Report:
             irz_message = fib_data.get("message")
 
             if fib_data:
-                for t in fib_data.get("targets", []):
-                    targets.append(t)
-                for r in fib_data.get("retracements", []):
-                    retracements.append(r)
+                targets.extend(fib_data.get("targets", []))
+                retracements.extend(fib_data.get("retracements", []))
 
         if manipulation["status"] != "clean":
             manipulations.append(ManipulationEvent(
@@ -76,7 +114,6 @@ def run_analysis(symbol_details: dict, timeframe: str = "1h") -> Report:
                 timestamp=manipulation["timestamp"]
             ))
 
-    # ✅ Override bias based on IRZ projection
     if fib_data:
         direction = fib_data.get("projection_direction")
         if direction == "up":
@@ -84,7 +121,6 @@ def run_analysis(symbol_details: dict, timeframe: str = "1h") -> Report:
         elif direction == "down":
             directional_bias = "bearish"
 
-    # 🖼️ Chart output
     chart_path = plot_full_analysis(
         df=df,
         symbol=input_symbol,
@@ -105,12 +141,13 @@ def run_analysis(symbol_details: dict, timeframe: str = "1h") -> Report:
         irz_zone=irz_zone,
         irz_message=irz_message,
         trendline_summary=trendline_summary,
+        trendlines=trendline_vectors,
         support_levels=supports,
         resistance_levels=resistances,
         chart_path=chart_path,
         targets=targets,
         manipulations=manipulations,
         retracements=retracements,
-        current_price=current_price,  # ✅ added
-        current_price_time=current_price_time  # ✅ added
+        current_price=current_price,
+        current_price_time=current_price_time
     )

@@ -10,7 +10,7 @@ from apscheduler.triggers.cron import CronTrigger
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.analyzer import run_analysis
-from utils.symbols import resolve_symbol_alias
+from utils.symbols import resolve_symbol_alias as resolve_symbol
 from formatters.markdown_formatter_discord import format_report_discord
 
 # 🔐 Load environment variables
@@ -22,24 +22,36 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# 🛑 Scheduler guard to prevent duplication
+# 🛑 Scheduler and ready guard
 scheduler_started = False
+bot_ready_once = False  # ✅ Prevent duplicate startup messages
+
+def normalize_timeframe(tf: str) -> str:
+    tf = tf.lower().replace("min", "m").replace("hour", "h").replace("hr", "h")
+    if tf.endswith("m") and tf[:-1].isdigit():
+        return f"{tf[:-1]}min"
+    elif tf.endswith("h") and tf[:-1].isdigit():
+        return f"{tf[:-1]}h"
+    elif tf == "daily":
+        return "1d"
+    return tf
 
 @bot.event
 async def on_ready():
-    global scheduler_started
+    global scheduler_started, bot_ready_once
+    if bot_ready_once:
+        return  # ✅ Avoid duplicate announcements
+    bot_ready_once = True
 
     print(f"✅ KawaiiTrader Discord bot ready as {bot.user}")
 
     if not scheduler_started:
         scheduler = AsyncIOScheduler()
-        trigger = CronTrigger(hour="13,14,17,19", minute=30, day_of_week="mon-fri")  # 9:30, 10:30, 1:30, 3:30 ET
+        trigger = CronTrigger(hour="13,14,17,19", minute=30, day_of_week="mon-fri")
         scheduler.add_job(send_scheduled_discord_reports, trigger)
         scheduler.start()
         scheduler_started = True
         print("📅 Scheduler started.")
-    else:
-        print("⚠️ Scheduler already started. Skipping duplicate start.")
 
     for channel_id in DISCORD_CHANNEL_IDS:
         channel = bot.get_channel(channel_id)
@@ -47,20 +59,37 @@ async def on_ready():
             await channel.send("✅ KawaiiTrader bot is live and scheduled.")
 
 @bot.command()
-async def report(ctx, symbol: str = "ES", tf: str = "15min"):
-    try:
-        resolved = resolve_symbol_alias(symbol)
-        report = run_analysis(resolved, tf)
-        output = format_report_discord(report)
+async def report(ctx, *args):
+    if not args:
+        await ctx.send("❌ Please specify at least one symbol or timeframe.")
+        return
 
-        await ctx.send(output[:2000])
+    # Separate raw symbol and timeframe arguments
+    raw_symbols = [arg for arg in args if not any(char.isdigit() for char in arg)]
+    raw_timeframes = [arg for arg in args if any(char.isdigit() for char in arg)]
 
-        chart_path = getattr(report, "chart_path", None)
-        if chart_path and os.path.exists(chart_path):
-            await ctx.send(file=discord.File(chart_path))
+    symbols = [resolve_symbol(sym.strip().upper()) for group in raw_symbols for sym in group.split(",") if sym.strip()]
+    timeframes = [normalize_timeframe(tf.strip()) for group in raw_timeframes for tf in group.split(",") if tf.strip()]
 
-    except Exception as e:
-        await ctx.send(f"❌ Error generating report for `{symbol} {tf}`: {e}")
+    if not symbols:
+        await ctx.send("❌ No valid symbols provided.")
+        return
+    if not timeframes:
+        timeframes = ["15min"]  # default
+
+    for symbol in symbols:
+        for tf in timeframes:
+            try:
+                report = run_analysis(symbol, tf)
+                output = format_report_discord(report)
+
+                await ctx.send(output[:2000])
+                chart_path = getattr(report, "chart_path", None)
+                if chart_path and os.path.exists(chart_path):
+                    await ctx.send(file=discord.File(chart_path))
+
+            except Exception as e:
+                await ctx.send(f"❌ Error generating report for `{symbol['input_symbol']} {tf}`: {e}")
 
 @bot.command()
 async def test_schedule(ctx):
@@ -73,7 +102,7 @@ async def send_scheduled_discord_reports():
 
     for tf in timeframes:
         try:
-            resolved = resolve_symbol_alias(symbol)
+            resolved = resolve_symbol(symbol)
             report = run_analysis(resolved, tf)
             output = format_report_discord(report)
             chart_path = getattr(report, "chart_path", None)

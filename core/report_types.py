@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional
 
 @dataclass
@@ -19,19 +19,23 @@ class Retracement:
 
 @dataclass
 class Report:
+    # Non-default fields first
     symbol: str
     timeframe: str
     range_low: float
     range_high: float
     directional_bias: str
-    irz_zone: Optional[str]
-    irz_message: Optional[str]
-    trendline_summary: Optional[str]
     support_levels: List[float]
     resistance_levels: List[float]
-    chart_path: Optional[str]
     targets: List[Target]
     manipulations: List[ManipulationEvent]
-    retracements: List[Retracement]  # ✅ For IRZ retracement levels
-    current_price: Optional[float] = None              # ✅ NEW
-    current_price_time: Optional[str] = None           # ✅ NEW
+    retracements: List[Retracement]
+
+    # Default fields below
+    irz_zone: Optional[str] = None
+    irz_message: Optional[str] = None
+    trendline_summary: Optional[str] = None
+    trendlines: List = field(default_factory=list)
+    chart_path: Optional[str] = None
+    current_price: Optional[float] = None
+    current_price_time: Optional[str] = None

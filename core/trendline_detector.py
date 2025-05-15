@@ -82,21 +82,58 @@ def detect_trendline(df: pd.DataFrame, timeframe: str = "1h", symbol: str = "ES"
     messages = []
     vectors = {}
 
+    current_idx = len(df) - 1
+    current_price = df["close"].iloc[-1]
+    current_low = df["low"].iloc[-1]
+    current_high = df["high"].iloc[-1]
+
+    def enrich_trend(trend, role):
+        slope = trend["slope"]
+        intercept = trend["intercept"]
+        start_idx = trend["start_index"]
+        idx_offset = current_idx - start_idx
+        trend_value = slope * idx_offset + intercept
+        distance = round(abs(current_price - trend_value), 2)
+
+        # Relative position classification
+        if current_low <= trend_value <= current_high:
+            position = "touching"
+            icon = "✋"
+        elif abs(current_price - trend_value) <= 2.0:
+            position = "at"
+            icon = "🟰"
+        elif trend_value > current_price:
+            position = "above"
+            icon = "🔺"
+        else:
+            position = "below"
+            icon = "🔻"
+
+        trend["trendline_value"] = round(trend_value, 2)
+        trend["distance"] = distance
+        trend["position"] = position
+        trend["icon"] = icon
+        trend["timeframe"] = timeframe
+        trend["role"] = role
+        trend["touch_points"] = [f"{p[1]:.2f}" for p in trend["points"]]
+
+        return trend
+
     if support_trend:
         role = classify_trendline(df, support_trend, timeframe=timeframe)
-        if "Support" in role:
-            vectors["Support"] = support_trend
-            levels = [f"{lvl:.2f}" for _, lvl in support_trend["points"]]
-            messages.append(f"🟩 {role} trendline detected ({timeframe})")
-            messages.append(f"    Touch points: {', '.join(levels)}")
+        enriched = enrich_trend(support_trend, role)
+        vectors["Support"] = enriched  # ✅ Stored under detection type
+        messages.append(f"🟩 {role} trendline detected ({timeframe})")
+        messages.append(f"    Position: {enriched['icon']} {enriched['position']} | Distance: {enriched['distance']} pts")
+        messages.append(f"    Touch points: {', '.join(enriched['touch_points'])}")
 
     if resistance_trend:
         role = classify_trendline(df, resistance_trend, timeframe=timeframe)
-        if "Resistance" in role or "flipped" in role:
-            vectors["Resistance"] = resistance_trend
-            levels = [f"{lvl:.2f}" for _, lvl in resistance_trend["points"]]
-            messages.append(f"🟥 {role} trendline detected ({timeframe})")
-            messages.append(f"    Touch points: {', '.join(levels)}")
+        enriched = enrich_trend(resistance_trend, role)
+        vectors["Resistance"] = enriched  # ✅ Stored under detection type
+        messages.append(f"🟥 {role} trendline detected ({timeframe})")
+        messages.append(f"    Position: {enriched['icon']} {enriched['position']} | Distance: {enriched['distance']} pts")
+        messages.append(f"    Touch points: {', '.join(enriched['touch_points'])}")
 
     if not messages:
         messages.append(f"No active trendline near current price ({timeframe})")

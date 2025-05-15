@@ -122,16 +122,18 @@ def detect_trendline(df: pd.DataFrame, timeframe: str = "1h", symbol: str = "ES"
     if support_trend:
         role = classify_trendline(df, support_trend, timeframe=timeframe)
         enriched = enrich_trend(support_trend, role)
-        vectors["Support"] = enriched  # ✅ Stored under detection type
-        messages.append(f"🟩 {role} trendline detected ({timeframe})")
+        vectors["Support"] = enriched
+        color = "🟩" if "Support" in role else "🟥"
+        messages.append(f"{color} {role} trendline detected ({timeframe})")
         messages.append(f"    Position: {enriched['icon']} {enriched['position']} | Distance: {enriched['distance']} pts")
         messages.append(f"    Touch points: {', '.join(enriched['touch_points'])}")
 
     if resistance_trend:
         role = classify_trendline(df, resistance_trend, timeframe=timeframe)
         enriched = enrich_trend(resistance_trend, role)
-        vectors["Resistance"] = enriched  # ✅ Stored under detection type
-        messages.append(f"🟥 {role} trendline detected ({timeframe})")
+        vectors["Resistance"] = enriched
+        color = "🟩" if "Support" in role else "🟥"
+        messages.append(f"{color} {role} trendline detected ({timeframe})")
         messages.append(f"    Position: {enriched['icon']} {enriched['position']} | Distance: {enriched['distance']} pts")
         messages.append(f"    Touch points: {', '.join(enriched['touch_points'])}")
 

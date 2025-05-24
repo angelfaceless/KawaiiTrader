@@ -21,7 +21,7 @@ def format_report_markdown(report) -> str:
         dt_utc = datetime.fromisoformat(report.current_price_time)
         dt_est = dt_utc.astimezone(ZoneInfo("America/New_York"))
         readable_time = dt_est.strftime("%A, %B %d, %Y at %I:%M %p %Z")
-        current_price_str = f"📌 *Current Price:* `{esc(report.current_price)}` on {esc(readable_time)}\n"
+        current_price_str = f"\n📌 *Current Price:* `{esc(report.current_price)}` on {esc(readable_time)}\n"
     else:
         current_price_str = ""
 
@@ -30,11 +30,10 @@ def format_report_markdown(report) -> str:
     resistance_str = ", ".join(f"`{esc(str(r))}`" for r in report.resistance_levels)
 
     # 📉 IRZ + Targets
-    irz_msg = f"\n{esc(report.irz_message)}" if report.irz_message else ""
+    irz_msg = f"\n\n*IRZ Levels:*\n{esc(report.irz_message)}" if report.irz_message else ""
 
     return f"""
-*{esc(report.symbol)} — {esc(report.timeframe)} Report*
-{current_price_str}
+*{esc(report.symbol)} — {esc(report.timeframe)} Report*{current_price_str}
 *Bias:* {esc(report.directional_bias)}
 *Range:* `{esc(report.range_low)} - {esc(report.range_high)}`
 

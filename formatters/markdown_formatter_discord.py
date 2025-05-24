@@ -1,14 +1,31 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+def format_trendline_for_report(trendline_messages):
+    """
+    Format trendline messages while preserving all position states
+    
+    This function handles all position states including:
+    - above (🔺)
+    - below (🔻)
+    - at (🟰)
+    - touching (✋)
+    """
+    if not trendline_messages:
+        return "None detected"
+    
+    # For Discord, we want to preserve the original trendline messages format
+    # without any modifications, as Discord doesn't need special escaping
+    return "\n".join(trendline_messages)
+
 def format_report_discord(report) -> str:
     """
-    Format a complete analysis report for Discord matching the Telegram format
+    Format a complete analysis report for Discord matching the Telegram format exactly
     
     This formatter produces output that exactly matches the Telegram format:
-    - Symbol, timeframe, and price on first line
-    - Date and time on second line
-    - Bias and range on third line
+    - Symbol, timeframe, and price on first line with proper formatting
+    - Date and time on second line in italics
+    - Bias and range on third line with proper formatting
     - Support and resistance with bullet points grouped in threes
     - Trendlines with original bullet point format
     - Manipulation and IRZ sections with proper formatting
@@ -26,6 +43,7 @@ def format_report_discord(report) -> str:
         current_price_str = "N/A"
 
     # Format support/resistance levels more compactly with bullet points
+    # Removed backticks for consistent number formatting with bottom sections
     support_levels = [f"{s}" for s in report.support_levels]
     resistance_levels = [f"{r}" for r in report.resistance_levels]
     
@@ -43,43 +61,39 @@ def format_report_discord(report) -> str:
     # Format trendlines - preserve the exact format from trendline_messages if available
     trendline_content = "None detected"
     if hasattr(report, 'trendline_messages') and report.trendline_messages:
-        trendline_content = "\n".join(report.trendline_messages)
+        trendline_content = format_trendline_for_report(report.trendline_messages)
     elif hasattr(report, 'trendline_summary') and report.trendline_summary:
         if report.trendline_summary == "No active trendlines":
             trendline_content = "None detected"
         else:
             trendline_content = report.trendline_summary
     
-    # Format manipulation data
+    # Format manipulation data with bullet points and formatting
     manipulation_str = "None detected"
     if hasattr(report, 'manipulations') and report.manipulations:
         manipulation_str = "\n".join(
-            f"{m.timestamp} — {m.direction} at {m.price}"
+            f"• {m.timestamp} — **{m.direction}** at {m.price}"
             for m in report.manipulations
         )
 
     # Format IRZ data
-    irz_content = ""
-    
-    # Format retracements if available
-    retrace_str = ""
-    if hasattr(report, 'retracements') and report.retracements:
-        retrace_str = "Retracement Zone:\n" + "\n".join(
-            f"🟠 {rt.label}: {rt.level}" for rt in report.retracements
-        )
-    
-    # Format targets if available
-    target_str = ""
-    if hasattr(report, 'targets') and report.targets:
-        target_str = "Profit Targets:\n" + "\n".join(
-            f"🎯 {t.label}: {t.level}" for t in report.targets
-        )
-    
-    # Use IRZ message if available
+    irz_content = "None available"
     if hasattr(report, 'irz_message') and report.irz_message:
         irz_content = report.irz_message
     else:
         # Otherwise build from components
+        retrace_str = ""
+        if hasattr(report, 'retracements') and report.retracements:
+            retrace_str = "Retracement Zone:\n" + "\n".join(
+                f"🟠 {rt.label}: {rt.level}" for rt in report.retracements
+            )
+        
+        target_str = ""
+        if hasattr(report, 'targets') and report.targets:
+            target_str = "Profit Targets:\n" + "\n".join(
+                f"🎯 {t.label}: {t.level}" for t in report.targets
+            )
+        
         irz_parts = []
         if retrace_str:
             irz_parts.append(retrace_str)
@@ -89,40 +103,40 @@ def format_report_discord(report) -> str:
             irz_content = "🟪 IRZ Levels (projected):\n\n" + "\n\n".join(irz_parts)
             if hasattr(report, 'invalidation_point') and report.invalidation_point:
                 irz_content += f"\n\n⚠️ Invalidation Point: {report.invalidation_point}"
-        else:
-            irz_content = "None available"
 
-    # Create header with symbol, timeframe, and price
-    header = f"{report.symbol} • {report.timeframe} • {current_price_str}"
+    # Create header with symbol, timeframe, and price with proper formatting
+    header = f"**{report.symbol}** • {report.timeframe} • {current_price_str}"
     
-    # Create timestamp line
-    timestamp = f"{date_str} at {time_str}" if time_str and date_str else ""
+    # Create timestamp line with italics
+    timestamp = f"_{date_str} at {time_str}_" if time_str and date_str else ""
     
-    # Create bias and range line
-    bias_range = f"Bias: {report.directional_bias} • Range: {report.range_low}-{report.range_high}"
+    # Create bias and range line with proper formatting
+    bias_range = f"**Bias:** {report.directional_bias} • **Range:** {report.range_low}-{report.range_high}"
 
-    # Build the report matching the Telegram format
+    # Build the report matching the Telegram format exactly
     report_text = header + "\n"
     if timestamp:
         report_text += timestamp + "\n"
     report_text += bias_range + "\n\n"
     
-    report_text += "🟢 Support \n"
+    report_text += "🟢 **Support** \n"
     report_text += "\n".join(support_groups) + "\n\n"
     
-    report_text += "🔴 Resistance \n"
+    report_text += "🔴 **Resistance** \n"
     report_text += "\n".join(resistance_groups) + "\n\n"
     
-    report_text += "Trendlines 📈\n"
+    report_text += "**Trendlines** 📈\n"
     report_text += trendline_content + "\n\n"
     
-    report_text += "⚡️Manipulation⚡️\n"
+    report_text += "⚡️ **Manipulation** ⚡️\n"
     report_text += manipulation_str + "\n\n"
     
-    report_text += "IRZ Levels 🎯\n"
+    report_text += "**IRZ Levels** 🎯\n"
     report_text += irz_content + "\n\n"
     
-    report_text += "🖼️"
+    # For Discord, we use a direct link to the chart image if available
+    if hasattr(report, 'chart_path') and report.chart_path:
+        report_text += f"🖼️"
     
     return report_text.strip()
 

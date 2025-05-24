@@ -46,7 +46,9 @@ def format_trendline_for_report(trendline_messages):
                 touch_points = line.split("Touch points:")[1].strip()
         
         # Create a more compact, sleek format that preserves all position states
-        formatted_message = f"{color_emoji} *{trendline_type}* • {position_full} • {distance}"
+        # Make sure to escape any hyphens in the distance value
+        distance_escaped = escape_telegram(distance)
+        formatted_message = f"{color_emoji} *{trendline_type}* • {position_full} • {distance_escaped}"
         formatted_messages.append(formatted_message)
     
     return "\n".join(formatted_messages)
@@ -61,15 +63,17 @@ def format_report_markdown(report) -> str:
         dt_est = dt_utc.astimezone(ZoneInfo("America/New_York"))
         time_str = dt_est.strftime("%I:%M %p %Z")
         date_str = dt_est.strftime("%b %d, %Y")
-        current_price_str = f"`{esc(report.current_price)}`"
+        # Removed backticks for consistent number formatting
+        current_price_str = f"{esc(report.current_price)}"
     else:
         time_str = ""
         date_str = ""
         current_price_str = "N/A"
 
     # Format support/resistance levels more compactly
-    support_levels = [f"`{esc(str(s))}`" for s in report.support_levels]
-    resistance_levels = [f"`{esc(str(r))}`" for r in report.resistance_levels]
+    # Removed backticks for consistent number formatting
+    support_levels = [f"{esc(str(s))}" for s in report.support_levels]
+    resistance_levels = [f"{esc(str(r))}" for r in report.resistance_levels]
     
     # Group levels in pairs for more compact display
     def group_levels(levels, group_size=3):
@@ -99,8 +103,9 @@ def format_report_markdown(report) -> str:
     
     # Format manipulation data
     if hasattr(report, 'manipulations') and report.manipulations:
+        # Removed backticks from price for consistent number formatting
         manipulation_str = "\n".join(
-            f"• {esc(m.timestamp)} — *{esc(m.direction)}* at `{esc(m.price)}`"
+            f"• {esc(m.timestamp)} — *{esc(m.direction)}* at {esc(m.price)}"
             for m in report.manipulations
         )
     else:
@@ -118,7 +123,10 @@ def format_report_markdown(report) -> str:
     timestamp = f"_{esc(date_str)} at {esc(time_str)}_" if time_str and date_str else ""
     
     # Create a sleek bias and range line - using bullet points instead of pipes
-    bias_range = f"*Bias:* {esc(report.directional_bias)} • *Range:* `{esc(report.range_low)}-{esc(report.range_high)}`"
+    # Removed backticks from range values for consistent number formatting
+    # Ensure the hyphen in the range is properly escaped
+    range_text = f"{esc(report.range_low)}\\-{esc(report.range_high)}"
+    bias_range = f"*Bias:* {esc(report.directional_bias)} • *Range:* {range_text}"
 
     # Build the report without using f-strings with backslashes
     report_text = header + "\n"

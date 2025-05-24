@@ -83,12 +83,19 @@ def get_latest_available_end(symbol_details, timeframe) -> datetime:
 def get_end_time_with_delay(current_time=None):
     now_utc = datetime.now(timezone.utc)
     now_est = now_utc.astimezone(EST).replace(second=0, microsecond=0)
+
     if now_est.weekday() == 5:
+        # Saturday — clamp to Friday 5:00 p.m. EST
         friday_est = now_est - timedelta(days=1)
-        return friday_est.replace(hour=16, minute=0).astimezone(timezone.utc)
-    elif now_est.weekday() == 6 and now_est.hour < 17:
-        friday_est = now_est - timedelta(days=2)
-        return friday_est.replace(hour=16, minute=0).astimezone(timezone.utc)
+        return friday_est.replace(hour=17, minute=0).astimezone(timezone.utc)
+    elif now_est.weekday() == 6:
+        if now_est.hour < 18:
+            # Sunday before 6:00 p.m. EST — clamp to Friday 5:00 p.m. EST
+            friday_est = now_est - timedelta(days=2)
+            return friday_est.replace(hour=17, minute=0).astimezone(timezone.utc)
+        else:
+            # Sunday after 6:00 p.m. EST — market open
+            return (now_est - timedelta(minutes=15)).astimezone(timezone.utc)
     return (now_est - timedelta(minutes=15)).astimezone(timezone.utc)
 
 def fetch_ohlcv(symbol_details: dict, timeframe: str, lookback_days: int = None, current_time=None) -> pd.DataFrame:

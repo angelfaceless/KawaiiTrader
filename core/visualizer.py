@@ -3,13 +3,9 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-# import matplotlib.dates as mdates # Not strictly needed for current date formatting
 import datetime
 
 def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels, trendlines, fib_data, range_data):
-    # df is the original, unsliced DataFrame from analyzer.py
-
-    # Determine the slice of the DataFrame to display based on timeframe
     if timeframe == "1min":
         df_display = df.copy().tail(150)
         width = 0.7
@@ -40,7 +36,7 @@ def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels,
         width = 0.65
         x_pad = 6
         y_zoom = True
-    elif timeframe == "4h" or timeframe == "1month": # Assuming 1month is a valid timeframe string
+    elif timeframe == "4h" or timeframe == "1month":
         df_display = df.copy().tail(300)
         width = 0.6
         x_pad = 5
@@ -52,16 +48,11 @@ def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels,
         y_zoom = False
 
     est_time_available = False
-    # Use the index from the sliced df_display for x-axis date formatting
-    df_display_est_index = df_display.index 
+    df_display_est_index = df_display.index
 
     if not isinstance(df_display.index, pd.DatetimeIndex):
         try:
-            # Create a new DataFrame for modification to avoid SettingWithCopyWarning on df_display
-            df_display_copy = df_display.copy()
-            df_display_copy.index = pd.to_datetime(df_display_copy.index)
-            df_display = df_display_copy # Assign back if conversion is successful
-            df_display_est_index = df_display.index
+            df_display.index = pd.to_datetime(df_display.index)
         except Exception as e:
             print(f"Warning: Could not convert display index to DatetimeIndex: {e}")
 
@@ -74,17 +65,14 @@ def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels,
             est_time_available = True
         except Exception as e:
             print(f"Warning: Could not convert display timestamps to EST: {e}")
-            df_display_est_index = df_display.index # Fallback to original display index
+            df_display_est_index = df_display.index
             est_time_available = False
-    else:
-        est_time_available = False
 
     fig_width = max(20, len(df_display) * 0.08)
     fig_height = 10
     fig, ax = plt.subplots(figsize=(fig_width, fig_height))
     ax.set_facecolor("#d8bfe6")
 
-    # Plot candles using 0-based indexing for the df_display
     for i, (_, row) in enumerate(df_display.iterrows()):
         color = "white" if row["close"] >= row["open"] else "black"
         ax.plot([i, i], [row["low"], row["high"]], color="black", linewidth=1, zorder=1)
@@ -101,39 +89,27 @@ def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels,
     for level in support_levels:
         ax.axhline(y=level, color="#77dd77", linestyle="-", linewidth=1.2, zorder=2.1)
 
-    # Corrected Trendline Plotting
-    # The 'df' argument is the original, full DataFrame passed from analyzer.py
-    original_index_offset_of_display_slice = len(df) - len(df_display)
-
+    original_index_offset = len(df) - len(df_display)
     for role, trend in trendlines.items():
         slope = trend["slope"]
         intercept = trend["intercept"]
-
-        # x-coordinates on the current display plot (0 to len(df_display)-1, extended)
-        x_coords_on_display_plot = np.arange(0, len(df_display) + 10) 
-
-        # Map these display plot x-coordinates to their corresponding original df integer indices
-        original_indices_for_trend_calc = original_index_offset_of_display_slice + x_coords_on_display_plot
-        
-        # Calculate y-values using the trendline's slope and intercept with original indices
-        y_values_for_trend_on_display_plot = slope * original_indices_for_trend_calc + intercept
-        
-        # Increased linewidth for prominence, color kept as white
-        ax.plot(x_coords_on_display_plot, y_values_for_trend_on_display_plot, color="white", linestyle="-", linewidth=2.0, zorder=2.2)
+        x_display = np.arange(0, len(df_display) + 10)
+        x_original = original_index_offset + x_display
+        y_values = slope * x_original + intercept
+        ax.plot(x_display, y_values, color="white", linestyle="-", linewidth=2.0, zorder=2.2)
 
     if fib_data:
-        # Anchor fib lines relative to the end of the displayed data
-        anchor_plot_index = len(df_display) - 11 
-        future_plot_index = len(df_display) + 10
-        for level, color_val in zip(fib_data.get("irz_levels", []), ["#fffacd", "#ffe4b5", "#fffacd"]):
-            ax.plot([anchor_plot_index, future_plot_index], [level, level], color=color_val, linestyle="-", linewidth=1.2, zorder=2.3)
+        anchor_x = len(df_display) - 11
+        future_x = len(df_display) + 10
+        for level, color_val in zip(fib_data.get("irz_levels", []), ["#ffe4b5", "#fffacd", "#ffe4b5"]):
+            ax.plot([anchor_x, future_x], [level, level], color=color_val, linestyle="-", linewidth=1.2, zorder=2.3)
         for level in fib_data.get("target_levels", []):
-            ax.plot([anchor_plot_index, future_plot_index], [level, level], color="white", linestyle="-", linewidth=1.5, zorder=2.3)
-        if "full_levels" in fib_data and 1.0 in fib_data.get("full_levels", {}):
-            ax.plot([anchor_plot_index, future_plot_index], [fib_data["full_levels"][1.0]]*2,
+            ax.plot([anchor_x, future_x], [level, level], color="white", linestyle="-", linewidth=1.5, zorder=2.3)
+        if "full_levels" in fib_data and 1.0 in fib_data["full_levels"]:
+            ax.plot([anchor_x, future_x], [fib_data["full_levels"][1.0]]*2,
                     color="white", linestyle="--", linewidth=1.2, zorder=2.3)
         if "anchor" in fib_data:
-            ax.plot([anchor_plot_index, future_plot_index], [fib_data["anchor"]]*2,
+            ax.plot([anchor_x, future_x], [fib_data["anchor"]]*2,
                     color="gray", linestyle="-", linewidth=1.2, zorder=2.3)
 
     if range_data.get("is_range", False):
@@ -141,7 +117,7 @@ def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels,
         range_high = range_data["range_high"]
         rect = patches.Rectangle(
             (-0.5, range_low),
-            width=len(df_display), # Width should be for the displayed part
+            width=len(df_display),
             height=range_high - range_low,
             linewidth=0,
             facecolor="purple",
@@ -192,7 +168,7 @@ def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels,
             plt.xticks(rotation=45, ha="right", fontsize=10)
         ax.set_xlabel("Time (EST)", fontsize=12)
     else:
-        ax.set_xticks([]) 
+        ax.set_xticks([])
         ax.set_xlabel("Candles", fontsize=12)
 
     os.makedirs("Charts", exist_ok=True)
@@ -201,4 +177,3 @@ def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels,
     plt.savefig(chart_path, format="png", dpi=300)
     plt.close(fig)
     return chart_path
-

@@ -2,52 +2,183 @@ from datetime import datetime
 from zoneinfo import ZoneInfo  # Requires Python 3.9+
 
 def escape_telegram(text) -> str:
+    """Escape special characters for Telegram markdown formatting"""
     text = str(text)
     for ch in r"_*[]()~`>#+-=|{}.!":
         text = text.replace(ch, f"\\{ch}")
     return text
 
+def format_trendline_for_report(trendline_messages):
+    """
+    Format trendline messages in a sleek design while preserving all position states
+    
+    This function handles all position states including:
+    - above (🔺)
+    - below (🔻)
+    - at (🟰)
+    - touching (✋)
+    """
+    if not trendline_messages:
+        return "None detected"
+    
+    formatted_messages = []
+    for message in trendline_messages:
+        # Split the message into lines
+        lines = message.split('\n')
+        # Extract the header (first line)
+        header = lines[0]
+        # Get the color emoji and trendline type
+        parts = header.split(' ', 1)
+        color_emoji = parts[0]
+        trendline_type = parts[1] if len(parts) > 1 else ""
+        
+        # Process the bullet points to extract key information
+        position_full = ""
+        distance = ""
+        touch_points = ""
+        
+        for line in lines[1:]:
+            if "Position:" in line:
+                position_full = line.split("Position:")[1].strip()
+            elif "Distance:" in line:
+                distance = line.split("Distance:")[1].strip()
+            elif "Touch points:" in line:
+                touch_points = line.split("Touch points:")[1].strip()
+        
+        # Create a more compact, sleek format that preserves all position states
+        formatted_message = f"{color_emoji} *{trendline_type}* • {position_full} • {distance}"
+        formatted_messages.append(formatted_message)
+    
+    return "\n".join(formatted_messages)
+
 def format_report_markdown(report) -> str:
+    """Format a complete analysis report for Telegram with a sleek, modern design"""
     esc = escape_telegram
 
-    # 🧠 Manipulation
-    manipulation_str = "\n".join(
-        f"{esc(m.timestamp)} — Broke *{esc(m.direction)}* at `{esc(m.price)}`"
-        for m in report.manipulations
-    ) if report.manipulations else "No manipulation detected"
-
-    # 📌 Current Price
+    # Format current price with timestamp
     if report.current_price is not None and report.current_price_time:
         dt_utc = datetime.fromisoformat(report.current_price_time)
         dt_est = dt_utc.astimezone(ZoneInfo("America/New_York"))
-        readable_time = dt_est.strftime("%A, %B %d, %Y at %I:%M %p %Z")
-        current_price_str = f"\n📌 *Current Price:* `{esc(report.current_price)}` on {esc(readable_time)}\n"
+        time_str = dt_est.strftime("%I:%M %p %Z")
+        date_str = dt_est.strftime("%b %d, %Y")
+        current_price_str = f"`{esc(report.current_price)}`"
     else:
-        current_price_str = ""
+        time_str = ""
+        date_str = ""
+        current_price_str = "N/A"
 
-    # 🧱 Support/Resistance
-    support_str = ", ".join(f"`{esc(str(s))}`" for s in report.support_levels)
-    resistance_str = ", ".join(f"`{esc(str(r))}`" for r in report.resistance_levels)
+    # Format support/resistance levels more compactly
+    support_levels = [f"`{esc(str(s))}`" for s in report.support_levels]
+    resistance_levels = [f"`{esc(str(r))}`" for r in report.resistance_levels]
+    
+    # Group levels in pairs for more compact display
+    def group_levels(levels, group_size=3):
+        result = []
+        for i in range(0, len(levels), group_size):
+            group = levels[i:i+group_size]
+            result.append(" • ".join(group))
+        return result
+    
+    support_groups = group_levels(support_levels)
+    resistance_groups = group_levels(resistance_levels)
+    
+    # Format trendlines - improved logic to ensure trendlines are never omitted
+    trendline_content = "None detected"
+    
+    # First try to use trendline_messages if available
+    if hasattr(report, 'trendline_messages') and report.trendline_messages:
+        trendline_content = format_trendline_for_report(report.trendline_messages)
+    # Fall back to trendline_summary if available and messages aren't
+    elif hasattr(report, 'trendline_summary') and report.trendline_summary:
+        # Don't escape if it's already the "No active trendlines" message
+        if report.trendline_summary == "No active trendlines":
+            trendline_content = "None detected"
+        else:
+            # For raw summary, we need to escape it
+            trendline_content = esc(report.trendline_summary)
+    
+    # Format manipulation data
+    if hasattr(report, 'manipulations') and report.manipulations:
+        manipulation_str = "\n".join(
+            f"• {esc(m.timestamp)} — *{esc(m.direction)}* at `{esc(m.price)}`"
+            for m in report.manipulations
+        )
+    else:
+        manipulation_str = "None detected"
 
-    # 📉 IRZ + Targets
-    irz_msg = f"\n\n*IRZ Levels:*\n{esc(report.irz_message)}" if report.irz_message else ""
+    # Format IRZ data with safer attribute checking
+    irz_content = "None available"
+    if hasattr(report, 'irz_message') and report.irz_message:
+        irz_content = esc(report.irz_message)
 
-    return f"""
-*{esc(report.symbol)} — {esc(report.timeframe)} Report*{current_price_str}
-*Bias:* {esc(report.directional_bias)}
-*Range:* `{esc(report.range_low)} - {esc(report.range_high)}`
+    # Create a sleek header with symbol, timeframe, and price - using bullet points instead of pipes
+    header = f"*{esc(report.symbol)}* • {esc(report.timeframe)} • {current_price_str}"
+    
+    # Create a sleek timestamp line
+    timestamp = f"_{esc(date_str)} at {esc(time_str)}_" if time_str and date_str else ""
+    
+    # Create a sleek bias and range line - using bullet points instead of pipes
+    bias_range = f"*Bias:* {esc(report.directional_bias)} • *Range:* `{esc(report.range_low)}-{esc(report.range_high)}`"
 
-*Support Levels:*
-{support_str}
+    # Build the report without using f-strings with backslashes
+    report_text = header + "\n"
+    if timestamp:
+        report_text += timestamp + "\n"
+    report_text += bias_range + "\n\n"
+    
+    report_text += "🟢 *Support* \n"
+    report_text += "\n".join(support_groups) + "\n\n"
+    
+    report_text += "🔴 *Resistance* \n"
+    report_text += "\n".join(resistance_groups) + "\n\n"
+    
+    # Ensure trendlines section is always included
+    report_text += "*Trendlines* 📈\n"
+    report_text += trendline_content + "\n\n"
+    
+    report_text += "⚡️ *Manipulation* ⚡️\n"
+    report_text += manipulation_str + "\n\n"
+    
+    report_text += "*IRZ Levels* 🎯\n"
+    report_text += irz_content + "\n\n"
+    
+    report_text += f"[🖼️]({esc(report.chart_path)})"
+    
+    return report_text.strip()
 
-*Resistance Levels:*
-{resistance_str}
-
-*Trendlines:*
-{esc(report.trendline_summary or 'No trendlines')}
-
-*Manipulation:*
-{manipulation_str}{irz_msg}
-
-🖼 [Chart Image]({esc(report.chart_path)})
-""".strip()
+# Example of how to integrate the trendline detector with the report formatter
+def integrate_trendlines_with_report(trendline_results, report):
+    """
+    Integrate trendline detection results with the report object
+    
+    Parameters:
+    - trendline_results: The result from detect_trendline function
+    - report: The report object to update
+    
+    Returns:
+    - Updated report object with trendline information
+    """
+    # More robust handling of trendline results
+    if trendline_results and isinstance(trendline_results, dict):
+        # Store the raw trendline messages for formatting
+        messages = trendline_results.get("messages", [])
+        if messages and isinstance(messages, list):
+            report.trendline_messages = messages
+            
+            # Create a summary for backward compatibility
+            report.trendline_summary = "\n".join(messages)
+        else:
+            report.trendline_messages = []
+            report.trendline_summary = "No active trendlines"
+        
+        # Store vector information if needed for further analysis
+        vectors = trendline_results.get("vectors", {})
+        if vectors and isinstance(vectors, dict):
+            report.trendline_vectors = vectors
+    else:
+        # Default values if trendline_results is None or invalid
+        report.trendline_messages = []
+        report.trendline_summary = "No active trendlines"
+        report.trendline_vectors = {}
+    
+    return report

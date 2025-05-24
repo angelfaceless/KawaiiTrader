@@ -318,21 +318,17 @@ def detect_trendline(df: pd.DataFrame, timeframe: str = "1h", symbol: str = "ES"
         enriched = enrich_trend(support_trend, role, current_price)
         vectors["Support"] = enriched
         color = "🟩" if "Support" in role else "🟥"
-        messages.append(f"{color} {role} trendline detected ({timeframe})")
-        messages.append(f"    Position: {enriched["icon"]} {enriched["position_text"]} | Distance: {enriched["distance"]} pts")
-        messages.append(f"    Touch points: {", ".join(enriched["touch_points"])}")
+        message = f"{color} {role} trendline detected ({timeframe})\n  • Position: {enriched["icon"]} {enriched["position_text"]}\n  • Distance: {enriched["distance"]} pts\n  • Touch points: {", ".join(enriched["touch_points"])}"
+        messages.append(message)
 
     if resistance_trend:
         role = classify_trendline(df, resistance_trend, timeframe=timeframe)
         enriched = enrich_trend(resistance_trend, role, current_price)
         vectors["Resistance"] = enriched
         color = "🟩" if "Support" in role else "🟥" 
-        messages.append(f"{color} {role} trendline detected ({timeframe})")
-        messages.append(f"    Position: {enriched["icon"]} {enriched["position_text"]} | Distance: {enriched["distance"]} pts")
-        messages.append(f"    Touch points: {", ".join(enriched["touch_points"])}")
+        message = f"{color} {role} trendline detected ({timeframe})\n  • Position: {enriched["icon"]} {enriched["position_text"]}\n  • Distance: {enriched["distance"]} pts\n  • Touch points: {", ".join(enriched["touch_points"])}"
+        messages.append(message)
 
     if not messages:
         messages.append(f"No active trendline near current price ({timeframe})")
     return {"messages": messages, "vectors": vectors}
-
-

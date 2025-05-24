@@ -102,15 +102,19 @@ def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels,
         anchor_x = len(df_display) - 11
         future_x = len(df_display) + 10
         for level, color_val in zip(fib_data.get("irz_levels", []), ["#ffe4b5", "#fffacd", "#ffe4b5"]):
-            ax.plot([anchor_x, future_x], [level, level], color=color_val, linestyle="-", linewidth=1.2, zorder=2.3)
+            # Only changed linewidth from 1.2 to 2.0
+            ax.plot([anchor_x, future_x], [level, level], color=color_val, linestyle="-", linewidth=2.0, zorder=2.3)
         for level in fib_data.get("target_levels", []):
-            ax.plot([anchor_x, future_x], [level, level], color="white", linestyle="-", linewidth=1.5, zorder=2.3)
+            # Only changed linewidth from 1.5 to 2.5
+            ax.plot([anchor_x, future_x], [level, level], color="white", linestyle="-", linewidth=2.5, zorder=2.3)
         if "full_levels" in fib_data and 1.0 in fib_data["full_levels"]:
+            # Only changed linewidth from 1.2 to 2.0
             ax.plot([anchor_x, future_x], [fib_data["full_levels"][1.0]]*2,
-                    color="white", linestyle="--", linewidth=1.2, zorder=2.3)
+                    color="white", linestyle="--", linewidth=2.0, zorder=2.3)
         if "anchor" in fib_data:
+            # Only changed linewidth from 1.2 to 1.5
             ax.plot([anchor_x, future_x], [fib_data["anchor"]]*2,
-                    color="gray", linestyle="-", linewidth=1.2, zorder=2.3)
+                    color="gray", linestyle="-", linewidth=1.5, zorder=2.3)
 
     if range_data.get("is_range", False):
         range_low = range_data["range_low"]

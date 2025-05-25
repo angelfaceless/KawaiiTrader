@@ -15,6 +15,7 @@ def detect_support_resistance(
     - ATR-based reversal strength
     - Optional volume spike confirmation
     - Clustering logic to reduce noise
+    - Filters supports below and resistances above current price
 
     Returns:
         (support_levels, resistance_levels): Cleaned key price levels
@@ -36,7 +37,7 @@ def detect_support_resistance(
         level_high = slice_df[['open', 'close']].max(axis=1).max()
         level_low = slice_df[['open', 'close']].min(axis=1).min()
 
-        # -- Filter: Wick touches and reversal bounce from LOW --
+        # -- Support Detection --
         support_bounces = 0
         support_body_rejected = False
         for j in range(i - window, i):
@@ -55,7 +56,7 @@ def detect_support_resistance(
         if support_bounces >= min_bounces and support_body_rejected and reversed_up and volume_ok:
             potential_supports.append(round(level_low, 2))
 
-        # -- Filter: Wick touches and reversal bounce from HIGH --
+        # -- Resistance Detection --
         resistance_bounces = 0
         resistance_body_rejected = False
         for j in range(i - window, i):
@@ -81,7 +82,9 @@ def detect_support_resistance(
                 clustered.append(level)
         return clustered
 
-    support_levels = cluster(potential_supports)
-    resistance_levels = cluster(potential_resistances)
+    # === Final Filtering: Keep only relative levels to current price ===
+    current_price = df["close"].iloc[-1]
+    support_levels = [s for s in cluster(potential_supports) if s < current_price]
+    resistance_levels = [r for r in cluster(potential_resistances) if r > current_price]
 
     return support_levels, resistance_levels

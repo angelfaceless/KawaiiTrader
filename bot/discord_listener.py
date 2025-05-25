@@ -5,6 +5,7 @@ from discord.ext import commands
 from dotenv import load_dotenv
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from datetime import datetime
 
 # 🔁 Allow relative imports from project root
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -54,9 +55,12 @@ async def on_ready():
         print("📅 Scheduler started.")
 
     for channel_id in DISCORD_CHANNEL_IDS:
-        channel = bot.get_channel(channel_id)
-        if channel:
-            await channel.send("✅ KawaiiTrader bot is live and scheduled.")
+        try:
+            channel = await bot.fetch_channel(channel_id)
+            if channel:
+                await channel.send("✅ KawaiiTrader bot is live and scheduled.")
+        except Exception as e:
+            print(f"❌ Failed to fetch or send to channel {channel_id}: {e}")
 
 @bot.command()
 async def report(ctx, *args):
@@ -97,22 +101,28 @@ async def test_schedule(ctx):
     await send_scheduled_discord_reports()
 
 async def send_scheduled_discord_reports():
+    print(f"⏰ Scheduled report triggered at {datetime.utcnow()} UTC")
     symbol = "ES"
     timeframes = ["1min", "5min", "15min", "1h", "4h"]
 
     for tf in timeframes:
         try:
             resolved = resolve_symbol(symbol)
+            print(f"🔍 Running analysis for {resolved['input_symbol']} {tf}")
             report = run_analysis(resolved, tf)
             output = format_report_discord(report)
             chart_path = getattr(report, "chart_path", None)
 
             for channel_id in DISCORD_CHANNEL_IDS:
-                channel = bot.get_channel(channel_id)
-                if channel:
-                    await channel.send(output[:2000])
-                    if chart_path and os.path.exists(chart_path):
-                        await channel.send(file=discord.File(chart_path))
+                try:
+                    channel = await bot.fetch_channel(channel_id)
+                    if channel:
+                        print(f"📤 Sending to channel {channel_id}")
+                        await channel.send(output[:2000])
+                        if chart_path and os.path.exists(chart_path):
+                            await channel.send(file=discord.File(chart_path))
+                except Exception as e:
+                    print(f"❌ Failed to send to channel {channel_id}: {e}")
 
         except Exception as e:
             print(f"❌ Scheduled Discord report failed for {symbol} {tf}: {e}")

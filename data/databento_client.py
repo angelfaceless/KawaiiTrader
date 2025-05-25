@@ -43,17 +43,14 @@ def get_dynamic_lookback(timeframe: str, target_candles: int = None) -> int:
         return 3
     if timeframe in ["1h", "4h"]:
         return 15
-    if timeframe == "1d":
-        return 100
-    if timeframe == "1w":
-        return 100
-    if timeframe in ["1month", "1mo"]:
-        return 360
 
     try:
         seconds = int(pd.to_timedelta(timeframe).total_seconds())
     except Exception:
-        seconds = 60
+        seconds = TIMEFRAME_SECONDS.get(timeframe, 60)
+
+    if seconds >= 86400:
+        return 365
 
     if 120 <= seconds < 300:
         return 4
@@ -65,12 +62,9 @@ def get_dynamic_lookback(timeframe: str, target_candles: int = None) -> int:
         return 100
     if 16201 <= seconds <= 97200:
         return 100
-    if 86400 <= seconds < 604800:
-        return 100
-    if seconds >= 604800:
-        return 100
+
     if "mo" in timeframe:
-        return 360
+        return 365
 
     if target_candles is not None:
         return max(1, math.ceil((target_candles * seconds) / 86400))

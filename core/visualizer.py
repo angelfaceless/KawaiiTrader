@@ -6,6 +6,8 @@ import matplotlib.patches as patches
 import datetime
 
 def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels, trendlines, fib_data, range_data):
+    static_timeframes = {"1min", "5min", "15min", "1h", "4h", "1d", "1w", "1mo", "1month"}
+
     if timeframe == "1min":
         df_display = df.copy().tail(150)
         width = 0.7
@@ -47,14 +49,17 @@ def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels,
         x_pad = 5
         y_zoom = False
 
+    if len(df_display) < 5:
+        return None
+
     est_time_available = False
     df_display_est_index = df_display.index
 
     if not isinstance(df_display.index, pd.DatetimeIndex):
         try:
             df_display.index = pd.to_datetime(df_display.index)
-        except Exception as e:
-            print(f"Warning: Could not convert display index to DatetimeIndex: {e}")
+        except Exception:
+            pass
 
     if isinstance(df_display.index, pd.DatetimeIndex):
         try:
@@ -63,12 +68,16 @@ def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels,
             else:
                 df_display_est_index = df_display.index.tz_convert("US/Eastern")
             est_time_available = True
-        except Exception as e:
-            print(f"Warning: Could not convert display timestamps to EST: {e}")
+        except Exception:
             df_display_est_index = df_display.index
             est_time_available = False
 
-    fig_width = max(20, len(df_display) * 0.08)
+    # ✅ Conditional width logic
+    if timeframe in static_timeframes:
+        fig_width = max(20, len(df_display) * 0.08)
+    else:
+        fig_width = min(len(df_display) * 0.08, 16.65)  # 16.65in = 4995px @ 300dpi
+
     fig_height = 10
     fig, ax = plt.subplots(figsize=(fig_width, fig_height))
     ax.set_facecolor("#d8bfe6")
@@ -102,18 +111,14 @@ def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels,
         anchor_x = len(df_display) - 11
         future_x = len(df_display) + 10
         for level, color_val in zip(fib_data.get("irz_levels", []), ["#ffe4b5", "#fffacd", "#ffe4b5"]):
-            # Only changed linewidth from 1.2 to 2.0
             ax.plot([anchor_x, future_x], [level, level], color=color_val, linestyle="-", linewidth=2.0, zorder=2.3)
         for level in fib_data.get("target_levels", []):
-            # Only changed linewidth from 1.5 to 2.5
             ax.plot([anchor_x, future_x], [level, level], color="white", linestyle="-", linewidth=2.5, zorder=2.3)
         if "full_levels" in fib_data and 1.0 in fib_data["full_levels"]:
-            # Only changed linewidth from 1.2 to 2.0
-            ax.plot([anchor_x, future_x], [fib_data["full_levels"][1.0]]*2,
+            ax.plot([anchor_x, future_x], [fib_data["full_levels"][1.0]] * 2,
                     color="white", linestyle="--", linewidth=2.0, zorder=2.3)
         if "anchor" in fib_data:
-            # Only changed linewidth from 1.2 to 1.5
-            ax.plot([anchor_x, future_x], [fib_data["anchor"]]*2,
+            ax.plot([anchor_x, future_x], [fib_data["anchor"]] * 2,
                     color="gray", linestyle="-", linewidth=1.5, zorder=2.3)
 
     if range_data.get("is_range", False):
@@ -129,7 +134,7 @@ def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels,
             zorder=0
         )
         ax.add_patch(rect)
-        ax.plot([-0.5, len(df_display)], [(range_low + range_high)/2]*2, color="white", linewidth=1, zorder=0.5)
+        ax.plot([-0.5, len(df_display)], [(range_low + range_high) / 2] * 2, color="white", linewidth=1, zorder=0.5)
 
     fib_right_pad = 10 if fib_data else 0
     ax.set_xlim(-x_pad, len(df_display) - 1 + x_pad + fib_right_pad)
@@ -158,9 +163,10 @@ def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels,
     ax.grid(True, zorder=-1, linestyle=":", alpha=0.7)
 
     if est_time_available:
-        if timeframe in ["1min", "5min", "15min", "1h"]:
-            special_times = [datetime.time(9,30), datetime.time(10,30), datetime.time(13,30), datetime.time(15,30)]
-            tick_pos = [i for i, ts in enumerate(df_display_est_index) if isinstance(ts, datetime.datetime) and ts.time() in special_times]
+        if timeframe in {"1min", "5min", "15min", "1h"}:
+            special_times = [datetime.time(9, 30), datetime.time(10, 30), datetime.time(13, 30), datetime.time(15, 30)]
+            tick_pos = [i for i, ts in enumerate(df_display_est_index)
+                        if isinstance(ts, datetime.datetime) and ts.time() in special_times]
             tick_labels = [df_display_est_index[i].strftime("%H:%M") for i in tick_pos if i < len(df_display_est_index)]
             ax.set_xticks(tick_pos)
             ax.set_xticklabels(tick_labels, rotation=45, ha="right", fontsize=10)

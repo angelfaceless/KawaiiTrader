@@ -41,10 +41,6 @@ def get_dynamic_lookback(timeframe: str, target_candles: int = None) -> int:
         return 4
     if timeframe == "1min":
         return 3
-    if target_candles is not None:
-        seconds = TIMEFRAME_SECONDS.get(timeframe)
-        if seconds:
-            return max(1, math.ceil((target_candles * seconds) / 86400))
     if timeframe in ["1h", "4h"]:
         return 15
     if timeframe == "1d":
@@ -53,6 +49,32 @@ def get_dynamic_lookback(timeframe: str, target_candles: int = None) -> int:
         return 100
     if timeframe in ["1month", "1mo"]:
         return 360
+
+    try:
+        seconds = int(pd.to_timedelta(timeframe).total_seconds())
+    except Exception:
+        seconds = 60
+
+    if 120 <= seconds < 300:
+        return 4
+    if 300 <= seconds <= 1800:
+        return 4
+    if 1860 <= seconds < 3600:
+        return 15
+    if 3600 < seconds <= 16200:
+        return 100
+    if 16201 <= seconds <= 97200:
+        return 100
+    if 86400 <= seconds < 604800:
+        return 100
+    if seconds >= 604800:
+        return 100
+    if "mo" in timeframe:
+        return 360
+
+    if target_candles is not None:
+        return max(1, math.ceil((target_candles * seconds) / 86400))
+
     return 7
 
 
@@ -80,23 +102,22 @@ def get_latest_available_end(symbol_details, timeframe) -> datetime:
             return floored
         raise
 
+
 def get_end_time_with_delay(current_time=None):
     now_utc = datetime.now(timezone.utc)
     now_est = now_utc.astimezone(EST).replace(second=0, microsecond=0)
 
     if now_est.weekday() == 5:
-        # Saturday — clamp to Friday 5:00 p.m. EST
         friday_est = now_est - timedelta(days=1)
         return friday_est.replace(hour=17, minute=0).astimezone(timezone.utc)
     elif now_est.weekday() == 6:
         if now_est.hour < 18:
-            # Sunday before 6:00 p.m. EST — clamp to Friday 5:00 p.m. EST
             friday_est = now_est - timedelta(days=2)
             return friday_est.replace(hour=17, minute=0).astimezone(timezone.utc)
         else:
-            # Sunday after 6:00 p.m. EST — market open
             return (now_est - timedelta(minutes=15)).astimezone(timezone.utc)
     return (now_est - timedelta(minutes=15)).astimezone(timezone.utc)
+
 
 def fetch_ohlcv(symbol_details: dict, timeframe: str, lookback_days: int = None, current_time=None) -> pd.DataFrame:
     if not API_KEY:
@@ -174,7 +195,14 @@ def fetch_ohlcv(symbol_details: dict, timeframe: str, lookback_days: int = None,
         df_trades["price"] = pd.to_numeric(df_trades["price"])
         df_trades["size"] = pd.to_numeric(df_trades["size"])
         df_trades.set_index(pd.to_datetime(df_trades["ts_event"]), inplace=True)
+
         rule = TIMEFRAME_MAP.get(timeframe)
+        if rule is None:
+            try:
+                rule = pd.to_timedelta(timeframe)
+            except Exception:
+                raise ValueError(f"Invalid timeframe: {timeframe}")
+
         ohlc = df_trades["price"].resample(rule).ohlc()
         volume = df_trades["size"].resample(rule).sum()
         df = pd.concat([ohlc, volume], axis=1)
@@ -196,6 +224,11 @@ def fetch_ohlcv(symbol_details: dict, timeframe: str, lookback_days: int = None,
         df["volume"] = df["volume"].fillna(0)
     elif timeframe != "1s":
         rule = TIMEFRAME_MAP.get(timeframe)
+        if rule is None:
+            try:
+                rule = pd.to_timedelta(timeframe)
+            except Exception:
+                raise ValueError(f"Invalid timeframe: {timeframe}")
         df = df.resample(rule).agg({
             "open": "first",
             "high": "max",

@@ -74,27 +74,31 @@ def get_dynamic_lookback(timeframe: str, target_candles: int = None) -> int:
 
 def get_latest_available_end(symbol_details, timeframe) -> datetime:
     client = Historical(key=API_KEY)
-    now = datetime.now(timezone.utc) - timedelta(minutes=1)
+    tf_sec = TIMEFRAME_SECONDS.get(timeframe, 60)
+    now = datetime.now(timezone.utc)
+
     try:
-        client.timeseries.get_range(
+        start = now - timedelta(minutes=5)
+        data = client.timeseries.get_range(
             dataset=symbol_details["dataset"],
             symbols=[symbol_details["db_symbol"]],
             stype_in=symbol_details["stype_in"],
             schema="trades",
-            start=now - timedelta(minutes=5),
+            start=start,
             end=now,
         )
-        return now
+        df = data.to_df() if data else pd.DataFrame()
+        if df.empty:
+            raise ValueError("No recent trades available.")
+        if "ts_event" not in df.columns and "hd.ts_event" in df.columns:
+            df.rename(columns={"hd.ts_event": "ts_event"}, inplace=True)
+        latest_ts = pd.to_datetime(df["ts_event"]).max()
+        aligned = latest_ts.floor(f"{tf_sec}s")
+        print(f"[SYNC] Latest trade-aligned end time: {aligned}")
+        return aligned
     except Exception as e:
-        msg = str(e)
-        if "data_end_after_available_end" in msg and "available up to " in msg:
-            corrected = msg.split("available up to ")[1].split(".")[0]
-            corrected_time = pd.to_datetime(corrected)
-            tf_sec = TIMEFRAME_SECONDS.get(timeframe, 60)
-            floored = corrected_time.floor(f"{tf_sec}s")
-            print(f"[SYNC] Clamped to latest full {timeframe} candle: {floored}")
-            return floored
-        raise
+        print(f"[WARN] Trade-based end time failed: {e}")
+        return get_end_time_with_delay()
 
 
 def get_end_time_with_delay(current_time=None):

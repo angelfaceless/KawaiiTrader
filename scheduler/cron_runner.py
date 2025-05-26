@@ -29,13 +29,14 @@ async def run_scheduled_reports():
             resolved = resolve_symbol(symbol)
             report = run_analysis(resolved, tf)
 
-            output = format_report_markdown(report)
+            # 👇 Prevent MarkdownV2-style escaping
+            output = format_report_markdown(report, escape=False)
             chart_path = getattr(report, "chart_path", None)
 
             print(f"\n[{symbol} @ {tf}]\n{output}")
 
             for cid in chat_ids:
-                # 📨 Send text report
+                # 📨 Send text report with classic Markdown
                 await bot.send_message(
                     chat_id=cid,
                     text=f"[{symbol} @ {tf}]\n{output}",

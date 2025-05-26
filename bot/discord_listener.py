@@ -24,6 +24,7 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 # 🛑 Scheduler and ready guard
+scheduler = AsyncIOScheduler()
 scheduler_started = False
 bot_ready_once = False  # ✅ Prevent duplicate startup messages
 
@@ -47,12 +48,13 @@ async def on_ready():
     print(f"✅ KawaiiTrader Discord bot ready as {bot.user}")
 
     if not scheduler_started:
-        scheduler = AsyncIOScheduler()
         trigger = CronTrigger(hour="13,14,17,19", minute=30, day_of_week="mon-fri")
         scheduler.add_job(send_scheduled_discord_reports, trigger)
         scheduler.start()
-        scheduler_started = True
         print("📅 Scheduler started.")
+        for job in scheduler.get_jobs():
+            print(f"🔔 Job {job.id} next run: {job.next_run_time}")
+        scheduler_started = True
 
     for channel_id in DISCORD_CHANNEL_IDS:
         try:

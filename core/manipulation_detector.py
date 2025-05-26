@@ -14,10 +14,10 @@ def detect_manipulation(df: pd.DataFrame, range_info: dict) -> dict:
             "timestamp": None, "price": None
         }
 
-    df_proc = df.copy().tail(300) # Process the last 300 candles as per user requirement
+    df_proc = df.copy().tail(300)  # Analyze only the last 300 candles
     df_proc.columns = [str(col).lower() for col in df_proc.columns]
 
-    if not all(col in df_proc.columns for col in ['close']):
+    if "close" not in df_proc.columns:
         return {
             "manipulated": False, "returned_to_range": False, "direction": None,
             "status": "error", "message": "DataFrame missing required 'close' column.",
@@ -60,22 +60,21 @@ def detect_manipulation(df: pd.DataFrame, range_info: dict) -> dict:
                 current_sequence_max_deviation = range_low - close_price
                 current_sequence_extreme_candle_timestamp = timestamp
                 current_sequence_extreme_candle_close = close_price
-        else:  # We are in a breakout sequence
+        else:
             if current_sequence_direction == "up":
-                if close_price > range_high:  # Still outside (above)
+                if close_price > range_high:
                     deviation = close_price - range_high
                     if deviation > current_sequence_max_deviation:
                         current_sequence_max_deviation = deviation
                         current_sequence_extreme_candle_timestamp = timestamp
                         current_sequence_extreme_candle_close = close_price
-                elif close_price < range_low:  # Crossed down through the range, new breakout sequence
-                    # UP sequence ended without returning *inside*. Start new DOWN sequence.
-                    in_breakout_sequence = True # Remains true, but for a new sequence
+                elif close_price < range_low:
+                    in_breakout_sequence = True
                     current_sequence_direction = "down"
                     current_sequence_max_deviation = range_low - close_price
                     current_sequence_extreme_candle_timestamp = timestamp
                     current_sequence_extreme_candle_close = close_price
-                elif range_low <= close_price <= range_high:  # Returned to inside the range
+                elif range_low <= close_price <= range_high:
                     if current_sequence_max_deviation > overall_max_deviation:
                         overall_max_deviation = current_sequence_max_deviation
                         overall_most_extreme_candle_details = {
@@ -83,24 +82,22 @@ def detect_manipulation(df: pd.DataFrame, range_info: dict) -> dict:
                             "price": current_sequence_extreme_candle_close,
                             "direction": "up"
                         }
-                    in_breakout_sequence = False # Reset for next potential breakout
-                # else: price is still outside but not more extreme, or within range but not a full return (e.g. on boundary)
+                    in_breakout_sequence = False
 
             elif current_sequence_direction == "down":
-                if close_price < range_low:  # Still outside (below)
+                if close_price < range_low:
                     deviation = range_low - close_price
                     if deviation > current_sequence_max_deviation:
                         current_sequence_max_deviation = deviation
                         current_sequence_extreme_candle_timestamp = timestamp
                         current_sequence_extreme_candle_close = close_price
-                elif close_price > range_high:  # Crossed up through the range, new breakout sequence
-                    # DOWN sequence ended without returning *inside*. Start new UP sequence.
-                    in_breakout_sequence = True # Remains true, but for a new sequence
+                elif close_price > range_high:
+                    in_breakout_sequence = True
                     current_sequence_direction = "up"
                     current_sequence_max_deviation = close_price - range_high
                     current_sequence_extreme_candle_timestamp = timestamp
                     current_sequence_extreme_candle_close = close_price
-                elif range_low <= close_price <= range_high:  # Returned to inside the range
+                elif range_low <= close_price <= range_high:
                     if current_sequence_max_deviation > overall_max_deviation:
                         overall_max_deviation = current_sequence_max_deviation
                         overall_most_extreme_candle_details = {
@@ -108,26 +105,25 @@ def detect_manipulation(df: pd.DataFrame, range_info: dict) -> dict:
                             "price": current_sequence_extreme_candle_close,
                             "direction": "down"
                         }
-                    in_breakout_sequence = False # Reset for next potential breakout
-    
+                    in_breakout_sequence = False
+
     if overall_most_extreme_candle_details:
         return {
             "manipulated": True,
-            "returned_to_range": True, 
+            "returned_to_range": True,
             "direction": overall_most_extreme_candle_details["direction"],
             "status": "manipulated",
             "message": f"🟨 Manipulation detected. Most extreme close ({overall_most_extreme_candle_details['price']:.2f}) occurred during a breakout {overall_most_extreme_candle_details['direction']}.",
             "timestamp": pd.to_datetime(overall_most_extreme_candle_details["timestamp"]),
             "price": overall_most_extreme_candle_details["price"]
         }
-    else:
-        return {
-            "manipulated": False,
-            "returned_to_range": False,
-            "direction": None,
-            "status": "clean",
-            "message": "No manipulation (breakout and return with an extreme candle) detected in the last 300 candles.",
-            "timestamp": None,
-            "price": None
-        }
 
+    return {
+        "manipulated": False,
+        "returned_to_range": False,
+        "direction": None,
+        "status": "clean",
+        "message": "No manipulation (breakout and return with an extreme candle) detected in the last 300 candles.",
+        "timestamp": None,
+        "price": None
+    }

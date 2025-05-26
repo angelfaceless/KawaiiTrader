@@ -7,31 +7,24 @@ from core.irz_fib import calculate_irz_projection
 from core.visualizer import plot_full_analysis
 from core.report_types import Report, Target, ManipulationEvent, Retracement
 
-# 🔧 Helper to truncate long touch point lists
 def truncate_touch_points(message: str, max_points: int = 10) -> str:
     if "Touch points:" not in message:
         return message
-
     prefix, points_part = message.split("Touch points:", 1)
     points = [p.strip() for p in points_part.split(",") if p.strip()]
     if len(points) <= max_points:
         return f"{prefix}Touch points: {', '.join(points)}"
-
     truncated = points[:max_points]
     return f"{prefix}Touch points: {', '.join(truncated)}... (+{len(points) - max_points} more)"
 
 def run_analysis(symbol_details: dict, timeframe: str = "1h") -> Report:
-
     input_symbol = symbol_details.get("input_symbol", symbol_details.get("db_symbol", "Unknown"))
-
     target_candles = 365 if timeframe == "1d" else 120
     lookback_days = get_dynamic_lookback(timeframe, target_candles=target_candles)
 
     df = fetch_ohlcv(symbol_details, timeframe, lookback_days=lookback_days)
-
     if df is None or df.empty:
         raise ValueError(f"No data returned for {input_symbol} on {timeframe}")
-
     if len(df) < 10:
         print(f"⚠️ Only {len(df)} candles returned for {input_symbol} on {timeframe}")
 
@@ -40,7 +33,7 @@ def run_analysis(symbol_details: dict, timeframe: str = "1h") -> Report:
 
     supports, resistances = detect_support_resistance(df)
 
-    # 📐 Trendlines + annotate visibility + truncate
+    # Trendlines
     trendline_data = detect_trendline(df, timeframe, input_symbol)
     raw_vectors = trendline_data["vectors"]
     trendline_vectors = {}
@@ -54,17 +47,10 @@ def run_analysis(symbol_details: dict, timeframe: str = "1h") -> Report:
         slope = trend["slope"]
         intercept = trend["intercept"]
         start_idx = trend["start_index"]
-
         x_vals = list(range(start_idx, len(df)))
         y_vals = [slope * x + intercept for x in x_vals]
+        trendline_vectors[clean_key] = {"slope": slope, "intercept": intercept, "start_index": start_idx}
 
-        trendline_vectors[clean_key] = {
-            "slope": slope,
-            "intercept": intercept,
-            "start_index": start_idx
-        }
-
-    # 🧠 Append all trendline messages after storing vectors
     for msg in trendline_data["messages"]:
         truncated_msg = truncate_touch_points(msg)
         if "Touch points:" in truncated_msg:
@@ -76,7 +62,9 @@ def run_analysis(symbol_details: dict, timeframe: str = "1h") -> Report:
 
     trendline_summary = "\n".join(annotated_messages)
 
+    # Range detection
     range_info = detect_body_range(df, timeframe)
+    print(f"🟪 Range Info → {range_info['message']}")
     range_low = range_info.get("range_low")
     range_high = range_info.get("range_high")
     directional_bias = range_info.get("bias", "neutral")
@@ -86,10 +74,11 @@ def run_analysis(symbol_details: dict, timeframe: str = "1h") -> Report:
     targets = []
     manipulations = []
     retracements = []
-
     fib_data = None
+
     if range_info.get("is_range", False):
         manipulation = detect_manipulation(df, range_info)
+        print(f"🟨 Manipulation Status → {manipulation['status']} | {manipulation['message']}")
 
         if manipulation["status"] == "manipulated":
             fib_data = calculate_irz_projection(
@@ -97,13 +86,10 @@ def run_analysis(symbol_details: dict, timeframe: str = "1h") -> Report:
                 range_high=range_high,
                 manipulation_direction=manipulation["direction"]
             )
-
             irz_zone = fib_data.get("irz_zone")
             irz_message = fib_data.get("message")
-
-            if fib_data:
-                targets.extend(fib_data.get("targets", []))
-                retracements.extend(fib_data.get("retracements", []))
+            targets.extend(fib_data.get("targets", []))
+            retracements.extend(fib_data.get("retracements", []))
 
         if manipulation["status"] != "clean":
             manipulations.append(ManipulationEvent(

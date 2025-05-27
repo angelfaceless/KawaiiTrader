@@ -3,7 +3,7 @@ import math
 import pandas as pd
 from datetime import datetime, timedelta, timezone
 import pytz
-from databento import Historical, Live
+from databento import Historical
 from dotenv import load_dotenv
 import sys
 
@@ -113,8 +113,8 @@ def get_end_time_with_delay(current_time=None):
             friday_est = now_est - timedelta(days=2)
             return friday_est.replace(hour=17, minute=0).astimezone(timezone.utc)
         else:
-            return (now_est - timedelta(minutes=15)).astimezone(timezone.utc)
-    return (now_est - timedelta(minutes=15)).astimezone(timezone.utc)
+            return now_est.astimezone(timezone.utc)
+    return now_est.astimezone(timezone.utc)
 
 
 def fetch_ohlcv(symbol_details: dict, timeframe: str, lookback_days: int = None, current_time=None) -> pd.DataFrame:
@@ -125,7 +125,6 @@ def fetch_ohlcv(symbol_details: dict, timeframe: str, lookback_days: int = None,
     db_symbol = symbol_details["db_symbol"]
     db_dataset = symbol_details["dataset"]
     db_stype_in = symbol_details["stype_in"]
-    asset_class = symbol_details.get("asset_class", "unknown")
 
     try:
         end_time = get_latest_available_end(symbol_details, timeframe)
@@ -235,33 +234,5 @@ def fetch_ohlcv(symbol_details: dict, timeframe: str, lookback_days: int = None,
             "volume": "sum"
         }).dropna(subset=["open", "high", "low", "close"], how="all")
         df["volume"] = df["volume"].fillna(0)
-
-    if asset_class == "futures":
-        try:
-            live = Live(key=API_KEY)
-            last = live.get_last(
-                dataset=db_dataset,
-                symbols=[db_symbol],
-                stype_in=db_stype_in,
-                schema="trades",
-            )
-            if last:
-                trade = last[0]
-                ts = pd.to_datetime(trade["ts_event"], utc=True)
-                price = float(trade["price"])
-                size = float(trade["size"])
-                candle_start = ts.floor(f"{pad_seconds}s")
-                if df.index.empty or df.index[-1] < candle_start:
-                    new_row = pd.DataFrame([{
-                        "open": price,
-                        "high": price,
-                        "low": price,
-                        "close": price,
-                        "volume": size
-                    }], index=[candle_start])
-                    df = pd.concat([df, new_row])
-                    print(f"[DEBUG] Appended live candle @ {candle_start} | price: {price}")
-        except Exception as e:
-            print(f"[WARN] Could not append live candle: {e}")
 
     return df

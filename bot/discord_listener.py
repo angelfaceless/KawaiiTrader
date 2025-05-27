@@ -1,5 +1,6 @@
 import os
 import sys
+import asyncio
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
@@ -70,7 +71,6 @@ async def report(ctx, *args):
         await ctx.send("❌ Please specify at least one symbol or timeframe.")
         return
 
-    # Separate raw symbol and timeframe arguments
     raw_symbols = [arg for arg in args if not any(char.isdigit() for char in arg)]
     raw_timeframes = [arg for arg in args if any(char.isdigit() for char in arg)]
 
@@ -83,19 +83,37 @@ async def report(ctx, *args):
     if not timeframes:
         timeframes = ["15min"]  # default
 
-    for symbol in symbols:
-        for tf in timeframes:
-            try:
-                report = run_analysis(symbol, tf)
-                output = format_report_discord(report)
+    async def generate_report(symbol, tf):
+        try:
+            report = await asyncio.to_thread(run_analysis, symbol, tf)
+            output = format_report_discord(report)
+            chart_path = getattr(report, "chart_path", None)
+            return {
+                "symbol": symbol["input_symbol"],
+                "timeframe": tf,
+                "output": output,
+                "chart_path": chart_path,
+                "error": None,
+            }
+        except Exception as e:
+            return {
+                "symbol": symbol["input_symbol"],
+                "timeframe": tf,
+                "output": None,
+                "chart_path": None,
+                "error": str(e),
+            }
 
-                await ctx.send(output[:2000])
-                chart_path = getattr(report, "chart_path", None)
-                if chart_path and os.path.exists(chart_path):
-                    await ctx.send(file=discord.File(chart_path))
+    tasks = [generate_report(symbol, tf) for symbol in symbols for tf in timeframes]
+    results = await asyncio.gather(*tasks)
 
-            except Exception as e:
-                await ctx.send(f"❌ Error generating report for `{symbol['input_symbol']} {tf}`: {e}")
+    for result in results:
+        if result["error"]:
+            await ctx.send(f"❌ Error generating report for `{result['symbol']} {result['timeframe']}`: {result['error']}")
+        else:
+            await ctx.send(result["output"][:2000])
+            if result["chart_path"] and os.path.exists(result["chart_path"]):
+                await ctx.send(file=discord.File(result["chart_path"]))
 
 @bot.command()
 async def test_schedule(ctx):
@@ -111,7 +129,7 @@ async def send_scheduled_discord_reports():
         try:
             resolved = resolve_symbol(symbol)
             print(f"🔍 Running analysis for {resolved['input_symbol']} {tf}")
-            report = run_analysis(resolved, tf)
+            report = await asyncio.to_thread(run_analysis, resolved, tf)
             output = format_report_discord(report)
             chart_path = getattr(report, "chart_path", None)
 

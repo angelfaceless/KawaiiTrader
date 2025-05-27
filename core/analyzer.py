@@ -6,6 +6,7 @@ from core.manipulation_detector import detect_manipulation
 from core.irz_fib import calculate_irz_projection
 from core.visualizer import plot_full_analysis
 from core.report_types import Report, Target, ManipulationEvent, Retracement
+from utils.htfcontext_helper import compare_levels_with_htf
 
 def truncate_touch_points(message: str, max_points: int = 10) -> str:
     if "Touch points:" not in message:
@@ -61,6 +62,16 @@ def run_analysis(symbol_details: dict, timeframe: str = "1h") -> Report:
         annotated_messages.append(truncated_msg)
 
     trendline_summary = "\n".join(annotated_messages)
+
+    # HTF Context Comparison
+    confidence = compare_levels_with_htf(
+        symbol_details,
+        timeframe,
+        df,
+        supports,
+        resistances,
+        trendline_vectors
+    )
 
     # Range detection
     range_info = detect_body_range(df, timeframe)
@@ -133,5 +144,6 @@ def run_analysis(symbol_details: dict, timeframe: str = "1h") -> Report:
         manipulations=manipulations,
         retracements=retracements,
         current_price=current_price,
-        current_price_time=current_price_time
+        current_price_time=current_price_time,
+        confidence=confidence  # This can now be displayed in formatters
     )

@@ -1,9 +1,19 @@
 import os
 import numpy as np
 import pandas as pd
+import matplotlib
+matplotlib.use("Agg")  # ✅ Force non-GUI backend to avoid NSWindow thread crash on macOS
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import datetime
+import asyncio
+
+# 🔐 Lock to serialize rendering
+render_lock = asyncio.Lock()
+
+async def safe_plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels, trendlines, fib_data, range_data):
+    async with render_lock:
+        return plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels, trendlines, fib_data, range_data)
 
 def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels, trendlines, fib_data, range_data):
     static_timeframes = {"1min", "5min", "15min", "1h", "4h", "1d", "1w", "1mo", "1month"}
@@ -72,27 +82,20 @@ def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels,
             df_display_est_index = df_display.index
             est_time_available = False
 
-    # ✅ Conditional width logic
     if timeframe in static_timeframes:
         fig_width = max(20, len(df_display) * 0.08)
     else:
-        fig_width = min(len(df_display) * 0.08, 16.65)  # 16.65in = 4995px @ 300dpi
+        fig_width = min(len(df_display) * 0.08, 16.65)
 
     fig_height = 10
     fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+    plt.pause(0.01)
     ax.set_facecolor("#d8bfe6")
 
     for i, (_, row) in enumerate(df_display.iterrows()):
         color = "white" if row["close"] >= row["open"] else "black"
         ax.plot([i, i], [row["low"], row["high"]], color="black", linewidth=1, zorder=1)
-        body_patch = plt.Rectangle(
-            (i - width / 2, min(row["open"], row["close"])),
-            width,
-            abs(row["close"] - row["open"]),
-            facecolor=color,
-            edgecolor="black",
-            zorder=2
-        )
+        body_patch = plt.Rectangle((i - width / 2, min(row["open"], row["close"])), width, abs(row["close"] - row["open"]), facecolor=color, edgecolor="black", zorder=2)
         ax.add_patch(body_patch)
 
     for level in support_levels:
@@ -115,24 +118,14 @@ def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels,
         for level in fib_data.get("target_levels", []):
             ax.plot([anchor_x, future_x], [level, level], color="white", linestyle="-", linewidth=2.5, zorder=2.3)
         if "full_levels" in fib_data and 1.0 in fib_data["full_levels"]:
-            ax.plot([anchor_x, future_x], [fib_data["full_levels"][1.0]] * 2,
-                    color="white", linestyle="--", linewidth=2.0, zorder=2.3)
+            ax.plot([anchor_x, future_x], [fib_data["full_levels"][1.0]] * 2, color="white", linestyle="--", linewidth=2.0, zorder=2.3)
         if "anchor" in fib_data:
-            ax.plot([anchor_x, future_x], [fib_data["anchor"]] * 2,
-                    color="gray", linestyle="-", linewidth=1.5, zorder=2.3)
+            ax.plot([anchor_x, future_x], [fib_data["anchor"]] * 2, color="gray", linestyle="-", linewidth=1.5, zorder=2.3)
 
     if range_data.get("is_range", False):
         range_low = range_data["range_low"]
         range_high = range_data["range_high"]
-        rect = patches.Rectangle(
-            (-0.5, range_low),
-            width=len(df_display),
-            height=range_high - range_low,
-            linewidth=0,
-            facecolor="purple",
-            alpha=0.08,
-            zorder=0
-        )
+        rect = patches.Rectangle((-0.5, range_low), width=len(df_display), height=range_high - range_low, linewidth=0, facecolor="purple", alpha=0.08, zorder=0)
         ax.add_patch(rect)
         ax.plot([-0.5, len(df_display)], [(range_low + range_high) / 2] * 2, color="white", linewidth=1, zorder=0.5)
 
@@ -148,13 +141,7 @@ def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels,
             if "anchor" in fib_data:
                 price_bounds.append(fib_data["anchor"])
         low, high = min(price_bounds), max(price_bounds)
-        margin_factor = (
-            0.005 if timeframe == "1min" else
-            0.003 if timeframe == "5min" else
-            0.0015 if timeframe == "15min" else
-            0.0012 if timeframe == "1h" else
-            0.001
-        )
+        margin_factor = 0.005 if timeframe == "1min" else 0.003 if timeframe == "5min" else 0.0015 if timeframe == "15min" else 0.0012 if timeframe == "1h" else 0.001
         margin = (high - low) * margin_factor
         ax.set_ylim(low - margin, high + margin)
 
@@ -165,8 +152,7 @@ def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels,
     if est_time_available:
         if timeframe in {"1min", "5min", "15min", "1h"}:
             special_times = [datetime.time(9, 30), datetime.time(10, 30), datetime.time(13, 30), datetime.time(15, 30)]
-            tick_pos = [i for i, ts in enumerate(df_display_est_index)
-                        if isinstance(ts, datetime.datetime) and ts.time() in special_times]
+            tick_pos = [i for i, ts in enumerate(df_display_est_index) if isinstance(ts, datetime.datetime) and ts.time() in special_times]
             tick_labels = [df_display_est_index[i].strftime("%H:%M") for i in tick_pos if i < len(df_display_est_index)]
             ax.set_xticks(tick_pos)
             ax.set_xticklabels(tick_labels, rotation=45, ha="right", fontsize=10)
@@ -184,6 +170,7 @@ def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels,
     os.makedirs("Charts", exist_ok=True)
     chart_path = os.path.join("Charts", f"chart_{symbol}_{timeframe}.png")
     plt.tight_layout(pad=1.0)
+    fig.canvas.draw()
     plt.savefig(chart_path, format="png", dpi=300)
     plt.close(fig)
     return chart_path

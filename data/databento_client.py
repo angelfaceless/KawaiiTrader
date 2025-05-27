@@ -160,16 +160,17 @@ def fetch_ohlcv(symbol_details: dict, timeframe: str, lookback_days: int = None,
             corrected = msg.split("available up to ")[1].split(".")[0]
             safe_end_time = pd.to_datetime(corrected)
             print(f"[FALLBACK] Available end: {safe_end_time}")
+            end_time = safe_end_time
+            start_time = end_time - timedelta(days=lookback_days)  # ✅ Realigned to fallback end_time
             data = client.timeseries.get_range(
                 dataset=db_dataset,
                 symbols=[db_symbol],
                 stype_in=db_stype_in,
                 schema="ohlcv-1s",
                 start=start_time,
-                end=safe_end_time,
+                end=end_time,
             )
             df = data.to_df() if data else pd.DataFrame()
-            end_time = safe_end_time
         else:
             raise
 

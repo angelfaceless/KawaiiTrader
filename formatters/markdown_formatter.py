@@ -90,7 +90,6 @@ def format_report_markdown(report, escape=True) -> str:
         date_str = ""
         current_price_str = "N/A"
 
-    # ✅ S/R levels with circle emojis removed
     support_levels = [esc(s) for s in report.support_levels]
     resistance_levels = [esc(r) for r in report.resistance_levels]
 
@@ -123,7 +122,8 @@ def format_report_markdown(report, escape=True) -> str:
     range_text = f"{esc(report.range_low)}\\-{esc(report.range_high)}" if escape else f"{report.range_low}-{report.range_high}"
     bias_range = f"*Bias:* {esc(report.directional_bias)} • *Range:* {range_text}"
 
-    report_text = header + "\n"
+    report_text = "━━━━━━━ 🌸🌸🌸 ━━━━━━━\n\n"
+    report_text += header + "\n"
     if timestamp:
         report_text += timestamp + "\n"
     report_text += bias_range + "\n\n"

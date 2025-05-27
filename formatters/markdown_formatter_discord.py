@@ -90,7 +90,8 @@ def format_report_discord(report) -> str:
     timestamp = f"_{date_str} at {time_str}_" if time_str and date_str else ""
     bias_range = f"**Bias:** {report.directional_bias} • **Range:** {report.range_low}-{report.range_high}"
 
-    report_text = header + "\n"
+    report_text = "━━━━━━━━━━━━━ 🌸🌸🌸 ━━━━━━━━━━━━━\n\n"
+    report_text += header + "\n"
     if timestamp:
         report_text += timestamp + "\n"
     report_text += bias_range + "\n\n"

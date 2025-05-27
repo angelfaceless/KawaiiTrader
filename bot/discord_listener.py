@@ -89,26 +89,30 @@ async def report(ctx, *args):
     plural = "report" if len(symbols) * len(timeframes) == 1 else "reports"
     await ctx.send(f"🌸 Running {plural} for {sym_str} @ {tf_str}...")
 
+    # ✅ Limit concurrent report processing to reduce memory usage
+    semaphore = asyncio.Semaphore(2)
+
     async def generate_report(symbol, tf):
-        try:
-            report = await asyncio.to_thread(run_analysis, symbol, tf)
-            output = format_report_discord(report)
-            chart_path = getattr(report, "chart_path", None)
-            return {
-                "symbol": symbol["input_symbol"],
-                "timeframe": tf,
-                "output": output,
-                "chart_path": chart_path,
-                "error": None,
-            }
-        except Exception as e:
-            return {
-                "symbol": symbol["input_symbol"],
-                "timeframe": tf,
-                "output": None,
-                "chart_path": None,
-                "error": str(e),
-            }
+        async with semaphore:
+            try:
+                report = await asyncio.to_thread(run_analysis, symbol, tf)
+                output = format_report_discord(report)
+                chart_path = getattr(report, "chart_path", None)
+                return {
+                    "symbol": symbol["input_symbol"],
+                    "timeframe": tf,
+                    "output": output,
+                    "chart_path": chart_path,
+                    "error": None,
+                }
+            except Exception as e:
+                return {
+                    "symbol": symbol["input_symbol"],
+                    "timeframe": tf,
+                    "output": None,
+                    "chart_path": None,
+                    "error": str(e),
+                }
 
     tasks = [generate_report(symbol, tf) for symbol in symbols for tf in timeframes]
     results = await asyncio.gather(*tasks)

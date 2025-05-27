@@ -90,7 +90,7 @@ async def report(ctx, *args):
     await ctx.send(f"🌸 Running {plural} for {sym_str} @ {tf_str}...")
 
     # ✅ Limit concurrent report processing to reduce memory usage
-    semaphore = asyncio.Semaphore(6)
+    semaphore = asyncio.Semaphore(4)
 
     async def generate_report(symbol, tf):
         async with semaphore:

@@ -83,6 +83,12 @@ async def report(ctx, *args):
     if not timeframes:
         timeframes = ["15min"]  # default
 
+    # 🌸 Dynamic message
+    sym_str = ", ".join(s["input_symbol"] for s in symbols)
+    tf_str = ", ".join(timeframes)
+    plural = "report" if len(symbols) * len(timeframes) == 1 else "reports"
+    await ctx.send(f"🌸 Running {plural} for {sym_str} @ {tf_str}...")
+
     async def generate_report(symbol, tf):
         try:
             report = await asyncio.to_thread(run_analysis, symbol, tf)

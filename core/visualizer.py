@@ -8,6 +8,15 @@ import matplotlib.patches as patches
 import datetime
 import asyncio
 
+# 🔥 Warm up matplotlib to prevent black charts on first few renders
+def warmup_matplotlib():
+    fig, ax = plt.subplots()
+    ax.plot([0, 1], [0, 1])
+    fig.savefig("/tmp/warmup.png")
+    plt.close(fig)
+
+warmup_matplotlib()
+
 # 🔐 Lock to serialize rendering
 render_lock = asyncio.Lock()
 

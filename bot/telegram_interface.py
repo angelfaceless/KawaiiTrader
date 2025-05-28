@@ -60,10 +60,13 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
         plural = "reports" if len(symbols) * len(timeframes) > 1 else "report"
         await update.message.reply_text(f"🌸 Running {plural} for {symbol_list} @ {tf_list}...")
 
+        # ✅ Temp HTF cache for this command
+        htf_cache = {}
+
         async def generate_report(symbol, tf):
             async with semaphore:
                 try:
-                    report_obj = await asyncio.to_thread(run_analysis, symbol, tf)
+                    report_obj = await asyncio.to_thread(run_analysis, symbol, tf, htf_cache)
                     report_text = format_report_markdown(report_obj)
                     return {
                         "symbol": symbol.get("input_symbol", symbol.get("db_symbol", "???")),

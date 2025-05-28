@@ -8,6 +8,7 @@ from core.visualizer import plot_full_analysis
 from core.report_types import Report, Target, ManipulationEvent, Retracement
 from utils.htfcontext_helper import compare_levels_with_htf
 
+
 def truncate_touch_points(message: str, max_points: int = 10) -> str:
     if "Touch points:" not in message:
         return message
@@ -18,12 +19,25 @@ def truncate_touch_points(message: str, max_points: int = 10) -> str:
     truncated = points[:max_points]
     return f"{prefix}Touch points: {', '.join(truncated)}... (+{len(points) - max_points} more)"
 
-def run_analysis(symbol_details: dict, timeframe: str = "1h") -> Report:
+
+def run_analysis(symbol_details: dict, timeframe: str = "1h", htf_cache: dict = None) -> Report:
     input_symbol = symbol_details.get("input_symbol", symbol_details.get("db_symbol", "Unknown"))
     target_candles = 365 if timeframe == "1d" else 120
     lookback_days = get_dynamic_lookback(timeframe, target_candles=target_candles)
 
-    df = fetch_ohlcv(symbol_details, timeframe, lookback_days=lookback_days)
+    # ✅ HTF caching logic
+    if htf_cache is not None and timeframe in {"4h", "1d"}:
+        symbol_cache = htf_cache.get(input_symbol, {})
+        if timeframe in symbol_cache:
+            df = symbol_cache[timeframe]
+        else:
+            df = fetch_ohlcv(symbol_details, timeframe, lookback_days=lookback_days)
+            if input_symbol not in htf_cache:
+                htf_cache[input_symbol] = {}
+            htf_cache[input_symbol][timeframe] = df
+    else:
+        df = fetch_ohlcv(symbol_details, timeframe, lookback_days=lookback_days)
+
     if df is None or df.empty:
         raise ValueError(f"No data returned for {input_symbol} on {timeframe}")
     if len(df) < 10:
@@ -145,5 +159,5 @@ def run_analysis(symbol_details: dict, timeframe: str = "1h") -> Report:
         retracements=retracements,
         current_price=current_price,
         current_price_time=current_price_time,
-        confidence=confidence  # This can now be displayed in formatters
+        confidence=confidence
     )

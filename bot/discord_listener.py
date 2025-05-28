@@ -17,7 +17,7 @@ from formatters.markdown_formatter_discord import format_report_discord
 
 # 🔐 Load environment variables
 load_dotenv()
-DISCORD_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
+DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 DISCORD_CHANNEL_IDS = [int(cid.strip()) for cid in os.getenv("DISCORD_CHANNEL_IDS", "").split(",") if cid.strip()]
 
 intents = discord.Intents.default()
@@ -43,7 +43,7 @@ def normalize_timeframe(tf: str) -> str:
 async def on_ready():
     global scheduler_started, bot_ready_once
     if bot_ready_once:
-        return  # ✅ Avoid duplicate announcements
+        return
     bot_ready_once = True
 
     print(f"✅ KawaiiTrader Discord bot ready as {bot.user}")
@@ -81,21 +81,20 @@ async def report(ctx, *args):
         await ctx.send("❌ No valid symbols provided.")
         return
     if not timeframes:
-        timeframes = ["15min"]  # default
+        timeframes = ["15min"]
 
-    # 🌸 Dynamic message
     sym_str = ", ".join(s["input_symbol"] for s in symbols)
     tf_str = ", ".join(timeframes)
     plural = "report" if len(symbols) * len(timeframes) == 1 else "reports"
     await ctx.send(f"🌸 Running {plural} for {sym_str} @ {tf_str}...")
 
-    # ✅ Limit concurrent report processing to reduce memory usage
     semaphore = asyncio.Semaphore(16)
+    htf_cache = {}  # ✅ Cache 4h/1d per symbol across all reports
 
     async def generate_report(symbol, tf):
         async with semaphore:
             try:
-                report = await asyncio.to_thread(run_analysis, symbol, tf)
+                report = await asyncio.to_thread(run_analysis, symbol, tf, htf_cache)
                 output = format_report_discord(report)
                 chart_path = getattr(report, "chart_path", None)
                 return {
@@ -134,12 +133,13 @@ async def send_scheduled_discord_reports():
     print(f"⏰ Scheduled report triggered at {datetime.utcnow()} UTC")
     symbol = "ES"
     timeframes = ["1min", "5min", "15min", "1h", "4h"]
+    resolved = resolve_symbol(symbol)
+    htf_cache = {}  # ✅ Reuse cache for this scheduled batch
 
     for tf in timeframes:
         try:
-            resolved = resolve_symbol(symbol)
             print(f"🔍 Running analysis for {resolved['input_symbol']} {tf}")
-            report = await asyncio.to_thread(run_analysis, resolved, tf)
+            report = await asyncio.to_thread(run_analysis, resolved, tf, htf_cache)
             output = format_report_discord(report)
             chart_path = getattr(report, "chart_path", None)
 

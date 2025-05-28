@@ -13,6 +13,19 @@ from formatters.markdown_formatter import format_report_markdown
 load_dotenv()
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
+# ✅ Semaphore for limiting concurrency
+semaphore = asyncio.Semaphore(16)
+
+# ✅ Warm up matplotlib rendering context
+import matplotlib.pyplot as plt
+def warmup_matplotlib():
+    fig, ax = plt.subplots()
+    ax.plot([0, 1], [0, 1])
+    fig.savefig("/tmp/warmup.png")
+    plt.close(fig)
+
+warmup_matplotlib()
+
 def normalize_timeframe(tf: str) -> str:
     tf = tf.lower().replace("min", "m").replace("hour", "h").replace("hr", "h")
     if tf.endswith("m") and tf[:-1].isdigit():
@@ -48,24 +61,25 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"🌸 Running {plural} for {symbol_list} @ {tf_list}...")
 
         async def generate_report(symbol, tf):
-            try:
-                report_obj = await asyncio.to_thread(run_analysis, symbol, tf)
-                report_text = format_report_markdown(report_obj)
-                return {
-                    "symbol": symbol.get("input_symbol", symbol.get("db_symbol", "???")),
-                    "timeframe": tf,
-                    "text": report_text,
-                    "chart_path": getattr(report_obj, "chart_path", None),
-                    "error": None,
-                }
-            except Exception as e:
-                return {
-                    "symbol": symbol.get("input_symbol", symbol.get("db_symbol", "???")),
-                    "timeframe": tf,
-                    "text": None,
-                    "chart_path": None,
-                    "error": str(e),
-                }
+            async with semaphore:
+                try:
+                    report_obj = await asyncio.to_thread(run_analysis, symbol, tf)
+                    report_text = format_report_markdown(report_obj)
+                    return {
+                        "symbol": symbol.get("input_symbol", symbol.get("db_symbol", "???")),
+                        "timeframe": tf,
+                        "text": report_text,
+                        "chart_path": getattr(report_obj, "chart_path", None),
+                        "error": None,
+                    }
+                except Exception as e:
+                    return {
+                        "symbol": symbol.get("input_symbol", symbol.get("db_symbol", "???")),
+                        "timeframe": tf,
+                        "text": None,
+                        "chart_path": None,
+                        "error": str(e),
+                    }
 
         tasks = [generate_report(symbol, tf) for symbol in symbols for tf in timeframes]
         results = await asyncio.gather(*tasks)

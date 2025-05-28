@@ -22,7 +22,9 @@ render_lock = asyncio.Lock()
 
 async def safe_plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels, trendlines, fib_data, range_data):
     async with render_lock:
-        return plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels, trendlines, fib_data, range_data)
+        chart_path = plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels, trendlines, fib_data, range_data)
+        await asyncio.sleep(0.1)  # 🩹 Delay to prevent black charts in concurrent async environments
+        return chart_path
 
 def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels, trendlines, fib_data, range_data):
     static_timeframes = {"1min", "5min", "15min", "1h", "4h", "1d", "1w", "1mo", "1month"}

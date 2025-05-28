@@ -93,6 +93,7 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 await update.message.reply_markdown_v2(result["text"])
                 if result["chart_path"] and os.path.exists(result["chart_path"]):
+                    await asyncio.sleep(0.5)  # ✅ Delay to ensure file flush/render completes
                     with open(result["chart_path"], "rb") as chart_file:
                         await context.bot.send_photo(chat_id=update.effective_chat.id, photo=chart_file)
 

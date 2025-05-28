@@ -110,7 +110,7 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 suggested_tf = next_tf_map.get(result["timeframe"], "1h")
                 keyboard = [[f"/report {result['symbol']} {suggested_tf}"]]
                 reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
-                await update.message.reply_text("━━━━━━ 🌸🌸🌸 ━━━━━━", reply_markup=reply_markup)
+                await update.message.reply_text("Select next timeframe:", reply_markup=reply_markup)
 
     except Exception as e:
         await update.message.reply_text(f"❌ Unexpected error: {e}")

@@ -27,7 +27,9 @@ async def run_scheduled_reports():
     for tf in timeframes:
         try:
             resolved = resolve_symbol(symbol)
-            report = run_analysis(resolved, tf)
+
+            # 🧠 Async-safe run_analysis
+            report = await asyncio.to_thread(run_analysis, resolved, tf)
 
             # 👇 Prevent MarkdownV2-style escaping
             output = format_report_markdown(report, escape=False)

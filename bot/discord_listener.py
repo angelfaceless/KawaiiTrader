@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from datetime import datetime
+from pytz import timezone
 
 # 🔁 Allow relative imports from project root
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -17,8 +18,11 @@ from formatters.markdown_formatter_discord import format_report_discord
 
 # 🔐 Load environment variables
 load_dotenv()
-DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
+DISCORD_TOKEN = os.getenv("DISCORD_BOT_TOKEN")  # ✅ Fixed env key
 DISCORD_CHANNEL_IDS = [int(cid.strip()) for cid in os.getenv("DISCORD_CHANNEL_IDS", "").split(",") if cid.strip()]
+
+print(f"🧪 DISCORD_TOKEN loaded: {DISCORD_TOKEN[:8]}...") if DISCORD_TOKEN else print("❌ DISCORD_TOKEN is missing!")
+print(f"🧪 Loaded channel IDs: {DISCORD_CHANNEL_IDS}")
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -27,7 +31,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # 🛑 Scheduler and ready guard
 scheduler = AsyncIOScheduler()
 scheduler_started = False
-bot_ready_once = False  # ✅ Prevent duplicate startup messages
+bot_ready_once = False
 
 def normalize_timeframe(tf: str) -> str:
     tf = tf.lower().replace("min", "m").replace("hour", "h").replace("hr", "h")
@@ -89,7 +93,7 @@ async def report(ctx, *args):
     await ctx.send(f"🌸 Running {plural} for {sym_str} @ {tf_str}...")
 
     semaphore = asyncio.Semaphore(16)
-    htf_cache = {}  # ✅ Cache 4h/1d per symbol across all reports
+    htf_cache = {}
 
     async def generate_report(symbol, tf):
         async with semaphore:
@@ -130,11 +134,13 @@ async def test_schedule(ctx):
     await send_scheduled_discord_reports()
 
 async def send_scheduled_discord_reports():
-    print(f"⏰ Scheduled report triggered at {datetime.utcnow()} UTC")
+    now_est = datetime.now(timezone("US/Eastern")).strftime("%Y-%m-%d %H:%M:%S %Z")
+    print(f"⏰ Scheduled report triggered at {datetime.utcnow()} UTC / {now_est} EST")
+
     symbol = "ES"
     timeframes = ["1min", "5min", "15min", "1h", "4h"]
     resolved = resolve_symbol(symbol)
-    htf_cache = {}  # ✅ Reuse cache for this scheduled batch
+    htf_cache = {}
 
     for tf in timeframes:
         try:

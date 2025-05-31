@@ -7,13 +7,16 @@ def detect_support_resistance(
     tolerance: float = 0.002,
     min_bounces: int = 2,
     min_reversal_atr: float = 1.5,
-    use_volume: bool = True
+    use_volume: bool = True,
+    use_volume_profile: bool = True,
+    volume_bins: int = 100
 ):
     """
     Detects high-confidence support/resistance zones based on:
     - Wick + body bounce filtering
     - ATR-based reversal strength
     - Optional volume spike confirmation
+    - Optional Volume Profile HVN/LVN injection
     - Clustering logic to reduce noise
     - Filters supports below and resistances above current price
 
@@ -86,5 +89,36 @@ def detect_support_resistance(
     current_price = df["close"].iloc[-1]
     support_levels = [s for s in cluster(potential_supports) if s < current_price]
     resistance_levels = [r for r in cluster(potential_resistances) if r > current_price]
+
+    # === Volume Profile HVN/LVN Injection ===
+    if use_volume_profile:
+        typical_price = (df["high"] + df["low"] + df["close"]) / 3
+        volume_profile = pd.Series(0, index=np.linspace(df["low"].min(), df["high"].max(), volume_bins))
+
+        for price, volume in zip(typical_price, df["volume"]):
+            idx = volume_profile.index.get_indexer([price], method='nearest')[0]
+            volume_profile.iloc[idx] += volume
+
+        hvn_threshold = volume_profile.mean() + volume_profile.std()
+        lvn_threshold = volume_profile.mean() - volume_profile.std()
+
+        hvn_levels = volume_profile[volume_profile > hvn_threshold].index.tolist()
+        lvn_levels = volume_profile[volume_profile < lvn_threshold].index.tolist()
+
+        for level in hvn_levels:
+            if level < current_price:
+                support_levels.append(round(level, 2))
+            else:
+                resistance_levels.append(round(level, 2))
+
+        for level in lvn_levels:
+            if level < current_price:
+                support_levels.append(round(level, 2))
+            else:
+                resistance_levels.append(round(level, 2))
+
+        # Re-cluster to consolidate overlapping levels
+        support_levels = cluster(support_levels)
+        resistance_levels = cluster(resistance_levels)
 
     return support_levels, resistance_levels

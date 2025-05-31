@@ -80,7 +80,8 @@ def run_backtest(symbol_details: dict, timeframe: str, start_date: str, end_date
                         else:
                             raise ValueError("No timestamp column and index is not datetime. Cannot proceed.")
 
-                    report = run_analysis(symbol_details, timeframe)
+                    # ✅ Pass scan_dt into run_analysis to align report time with backtest time
+                    report = run_analysis(symbol_details, timeframe, current_time=scan_dt)
 
                     fib_start = report.range_data.get("start_time")
                     if (

@@ -161,7 +161,7 @@ def fetch_ohlcv(symbol_details: dict, timeframe: str, lookback_days: int = None,
             safe_end_time = pd.to_datetime(corrected)
             print(f"[FALLBACK] Available end: {safe_end_time}")
             end_time = safe_end_time
-            start_time = end_time - timedelta(days=lookback_days)  # ✅ Realigned to fallback end_time
+            start_time = end_time - timedelta(days=lookback_days)
             data = client.timeseries.get_range(
                 dataset=db_dataset,
                 symbols=[db_symbol],
@@ -175,6 +175,11 @@ def fetch_ohlcv(symbol_details: dict, timeframe: str, lookback_days: int = None,
             raise
 
     if df.empty:
+        delta_seconds = (end_time_padded - start_time).total_seconds()
+        if delta_seconds > 31_536_000:  # > 1 year
+            print(f"[SKIP] Trade fallback skipped due to excessive range: {delta_seconds} seconds")
+            return pd.DataFrame()
+
         print(f"[Warning] No OHLCV data — falling back to trades.")
         data_trades = client.timeseries.get_range(
             dataset=db_dataset,
@@ -188,11 +193,20 @@ def fetch_ohlcv(symbol_details: dict, timeframe: str, lookback_days: int = None,
         if df_trades.empty:
             print(f"[Warning] Still no trade data.")
             return pd.DataFrame()
+
         if "ts_event" not in df_trades.columns and "hd.ts_event" in df_trades.columns:
             df_trades.rename(columns={"hd.ts_event": "ts_event"}, inplace=True)
-        df_trades["price"] = pd.to_numeric(df_trades["price"])
-        df_trades["size"] = pd.to_numeric(df_trades["size"])
-        df_trades.set_index(pd.to_datetime(df_trades["ts_event"]), inplace=True)
+
+        df_trades["ts_event"] = pd.to_datetime(df_trades["ts_event"], errors="coerce")
+        bad_ts = df_trades["ts_event"].isna().sum()
+        if bad_ts > 0:
+            print(f"[WARN] Dropping {bad_ts} rows with invalid ts_event")
+        df_trades.dropna(subset=["ts_event"], inplace=True)
+
+        df_trades["price"] = pd.to_numeric(df_trades["price"], errors="coerce")
+        df_trades["size"] = pd.to_numeric(df_trades["size"], errors="coerce")
+        df_trades.dropna(subset=["price", "size"], inplace=True)
+        df_trades.set_index(df_trades["ts_event"], inplace=True)
 
         rule = TIMEFRAME_MAP.get(timeframe)
         if rule is None:

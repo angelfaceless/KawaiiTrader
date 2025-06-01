@@ -2,13 +2,12 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib
-matplotlib.use("Agg")  # ✅ Force non-GUI backend to avoid NSWindow thread crash on macOS
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import datetime
 import asyncio
 
-# 🔥 Warm up matplotlib to prevent black charts on first few renders
 def warmup_matplotlib():
     fig, ax = plt.subplots()
     ax.plot([0, 1], [0, 1])
@@ -17,71 +16,42 @@ def warmup_matplotlib():
 
 warmup_matplotlib()
 
-# 🔐 Lock to serialize rendering
 render_lock = asyncio.Lock()
 
 async def safe_plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels, trendlines, fib_data, range_data):
     async with render_lock:
         chart_path = plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels, trendlines, fib_data, range_data)
-        await asyncio.sleep(0.1)  # 🩹 Delay to prevent black charts in concurrent async environments
+        await asyncio.sleep(0.1)
         return chart_path
 
 def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels, trendlines, fib_data, range_data):
     static_timeframes = {"1min", "5min", "15min", "1h", "4h", "1d", "1w", "1mo", "1month"}
 
     if timeframe == "1min":
-        df_display = df.copy().tail(150)
-        width = 0.7
-        x_pad = 20
-        y_zoom = True
+        df_display = df.copy().tail(150); width = 0.7; x_pad = 20
     elif timeframe == "5min":
-        df_display = df.copy().tail(200)
-        width = 0.65
-        x_pad = 10
-        y_zoom = True
+        df_display = df.copy().tail(200); width = 0.65; x_pad = 10
     elif timeframe == "15min":
-        df_display = df.copy().tail(250)
-        width = 0.6
-        x_pad = 8
-        y_zoom = True
+        df_display = df.copy().tail(250); width = 0.6; x_pad = 8
     elif timeframe == "1h":
-        df_display = df.copy().tail(250)
-        width = 0.6
-        x_pad = 5
-        y_zoom = True
+        df_display = df.copy().tail(250); width = 0.6; x_pad = 5
     elif timeframe == "1d":
-        df_display = df.copy().tail(200)
-        width = 0.7
-        x_pad = 10
-        y_zoom = True
+        df_display = df.copy().tail(200); width = 0.7; x_pad = 10
     elif timeframe == "1w":
-        df_display = df.copy().tail(150)
-        width = 0.65
-        x_pad = 6
-        y_zoom = True
+        df_display = df.copy().tail(150); width = 0.65; x_pad = 6
     elif timeframe == "4h" or timeframe == "1month":
-        df_display = df.copy().tail(300)
-        width = 0.6
-        x_pad = 5
-        y_zoom = True
+        df_display = df.copy().tail(300); width = 0.6; x_pad = 5
     else:
-        df_display = df.copy().tail(300)
-        width = 0.6
-        x_pad = 5
-        y_zoom = False
+        df_display = df.copy().tail(300); width = 0.6; x_pad = 5
 
-    if len(df_display) < 5:
-        return None
+    y_zoom = timeframe in static_timeframes
+    if len(df_display) < 5: return None
 
     est_time_available = False
     df_display_est_index = df_display.index
-
     if not isinstance(df_display.index, pd.DatetimeIndex):
-        try:
-            df_display.index = pd.to_datetime(df_display.index)
-        except Exception:
-            pass
-
+        try: df_display.index = pd.to_datetime(df_display.index)
+        except: pass
     if isinstance(df_display.index, pd.DatetimeIndex):
         try:
             if df_display.index.tz is None:
@@ -89,15 +59,11 @@ def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels,
             else:
                 df_display_est_index = df_display.index.tz_convert("US/Eastern")
             est_time_available = True
-        except Exception:
+        except:
             df_display_est_index = df_display.index
             est_time_available = False
 
-    if timeframe in static_timeframes:
-        fig_width = max(20, len(df_display) * 0.08)
-    else:
-        fig_width = min(len(df_display) * 0.08, 16.65)
-
+    fig_width = max(20, len(df_display) * 0.08) if timeframe in static_timeframes else min(len(df_display) * 0.08, 16.65)
     fig_height = 10
     fig, ax = plt.subplots(figsize=(fig_width, fig_height))
     plt.pause(0.01)
@@ -106,16 +72,33 @@ def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels,
     for i, (_, row) in enumerate(df_display.iterrows()):
         color = "white" if row["close"] >= row["open"] else "black"
         ax.plot([i, i], [row["low"], row["high"]], color="black", linewidth=1, zorder=1)
-        body_patch = plt.Rectangle((i - width / 2, min(row["open"], row["close"])), width, abs(row["close"] - row["open"]), facecolor=color, edgecolor="black", zorder=2)
-        ax.add_patch(body_patch)
+        ax.add_patch(plt.Rectangle(
+            (i - width / 2, min(row["open"], row["close"])),
+            width,
+            abs(row["close"] - row["open"]),
+            facecolor=color,
+            edgecolor="black",
+            zorder=2
+        ))
 
     for level in support_levels:
         ax.axhline(y=level, color="#77dd77", linestyle="-", linewidth=1.2, zorder=2.1)
+        ax.annotate(
+            f"{level:.2f}",
+            xy=(len(df_display) - 1 + x_pad, level),
+            xytext=(6, 0),
+            textcoords="offset points",
+            fontsize=10,
+            color="black",
+            va="center",
+            ha="left",
+            zorder=2.2,
+            bbox=dict(boxstyle="round,pad=0.2", facecolor="#d8bfe6", edgecolor="none", alpha=0.9)
+        )
 
     original_index_offset = len(df) - len(df_display)
-    for role, trend in trendlines.items():
-        slope = trend["slope"]
-        intercept = trend["intercept"]
+    for trend in trendlines.values():
+        slope, intercept = trend["slope"], trend["intercept"]
         x_display = np.arange(0, len(df_display) + 10)
         x_original = original_index_offset + x_display
         y_values = slope * x_original + intercept
@@ -136,8 +119,10 @@ def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels,
     if range_data.get("is_range", False):
         range_low = range_data["range_low"]
         range_high = range_data["range_high"]
-        rect = patches.Rectangle((-0.5, range_low), width=len(df_display), height=range_high - range_low, linewidth=0, facecolor="purple", alpha=0.08, zorder=0)
-        ax.add_patch(rect)
+        ax.add_patch(patches.Rectangle(
+            (-0.5, range_low), len(df_display), range_high - range_low,
+            linewidth=0, facecolor="purple", alpha=0.08, zorder=0
+        ))
         ax.plot([-0.5, len(df_display)], [(range_low + range_high) / 2] * 2, color="white", linewidth=1, zorder=0.5)
 
     fib_right_pad = 10 if fib_data else 0
@@ -147,12 +132,15 @@ def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels,
         price_bounds = [df_display["low"].min(), df_display["high"].max()]
         if fib_data:
             price_bounds += fib_data.get("target_levels", []) + fib_data.get("irz_levels", [])
-            if "full_levels" in fib_data:
-                price_bounds += list(fib_data["full_levels"].values())
-            if "anchor" in fib_data:
-                price_bounds.append(fib_data["anchor"])
+            if "full_levels" in fib_data: price_bounds += list(fib_data["full_levels"].values())
+            if "anchor" in fib_data: price_bounds.append(fib_data["anchor"])
         low, high = min(price_bounds), max(price_bounds)
-        margin_factor = 0.005 if timeframe == "1min" else 0.003 if timeframe == "5min" else 0.0015 if timeframe == "15min" else 0.0012 if timeframe == "1h" else 0.001
+        margin_factor = (
+            0.005 if timeframe == "1min" else
+            0.003 if timeframe == "5min" else
+            0.0015 if timeframe == "15min" else
+            0.0012 if timeframe == "1h" else 0.001
+        )
         margin = (high - low) * margin_factor
         ax.set_ylim(low - margin, high + margin)
 
@@ -175,8 +163,7 @@ def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels,
             plt.xticks(rotation=45, ha="right", fontsize=10)
         ax.set_xlabel("Time (EST)", fontsize=12)
     else:
-        ax.set_xticks([])
-        ax.set_xlabel("Candles", fontsize=12)
+        ax.set_xticks([]); ax.set_xlabel("Candles", fontsize=12)
 
     os.makedirs("Charts", exist_ok=True)
     chart_path = os.path.join("Charts", f"chart_{symbol}_{timeframe}.png")

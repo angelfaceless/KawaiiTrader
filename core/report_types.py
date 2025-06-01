@@ -40,6 +40,8 @@ class Report:
     current_price: Optional[float] = None
     current_price_time: Optional[str] = None
 
-    # ✅ New: HTF alignment confidence tagging
-    # Dict[type: str, Dict[level: str|float, {level: str, matched_timeframes: List[str]}]]
+    # ✅ HTF alignment confidence tagging
     confidence: Dict[str, Dict[Union[str, float], Dict[str, Union[str, List[str]]]]] = field(default_factory=dict)
+
+    # 🌸 Kawaii Buy flag
+    kawaii_buy: bool = False

@@ -25,7 +25,6 @@ def run_analysis(symbol_details: dict, timeframe: str = "1h", htf_cache: dict = 
     target_candles = 365 if timeframe == "1d" else 120
     lookback_days = get_dynamic_lookback(timeframe, target_candles=target_candles)
 
-    # ✅ HTF caching logic
     if htf_cache is not None and timeframe in {"4h", "1d"}:
         symbol_cache = htf_cache.get(input_symbol, {})
         if timeframe in symbol_cache:
@@ -48,7 +47,6 @@ def run_analysis(symbol_details: dict, timeframe: str = "1h", htf_cache: dict = 
 
     supports, resistances = detect_support_resistance(df)
 
-    # Trendlines
     trendline_data = detect_trendline(df, timeframe, input_symbol)
     raw_vectors = trendline_data["vectors"]
     trendline_vectors = {}
@@ -77,7 +75,6 @@ def run_analysis(symbol_details: dict, timeframe: str = "1h", htf_cache: dict = 
 
     trendline_summary = "\n".join(annotated_messages)
 
-    # HTF Context Comparison
     confidence = compare_levels_with_htf(
         symbol_details,
         timeframe,
@@ -87,12 +84,18 @@ def run_analysis(symbol_details: dict, timeframe: str = "1h", htf_cache: dict = 
         trendline_vectors
     )
 
-    # Range detection
     range_info = detect_body_range(df, timeframe)
     print(f"🟪 Range Info → {range_info['message']}")
     range_low = range_info.get("range_low")
     range_high = range_info.get("range_high")
     directional_bias = range_info.get("bias", "neutral")
+
+    support_aligned = any(abs(s - range_low) / s < 0.002 for s in supports if range_low is not None)
+    range_info["support_aligned"] = support_aligned
+    if support_aligned:
+        range_info["message"] += " | 🟢 Range low aligns with support"
+    else:
+        range_info["message"] += " | ⚪ No support confluence at range low"
 
     irz_zone = None
     irz_message = None
@@ -100,6 +103,7 @@ def run_analysis(symbol_details: dict, timeframe: str = "1h", htf_cache: dict = 
     manipulations = []
     retracements = []
     fib_data = None
+    manipulation = {}
 
     if range_info.get("is_range", False):
         manipulation = detect_manipulation(df, range_info)
@@ -130,6 +134,14 @@ def run_analysis(symbol_details: dict, timeframe: str = "1h", htf_cache: dict = 
         elif direction == "down":
             directional_bias = "bearish"
 
+    # 🌸 Kawaii Buy condition
+    kawaii_buy = (
+        range_info.get("is_range", False) and
+        range_info.get("support_aligned", False) and
+        confidence.get("support", {}).get("aligned_with_htf", {}).get("count", 0) > 0 and
+        manipulation.get("direction") == "down"
+    )
+
     chart_path = plot_full_analysis(
         df=df,
         symbol=input_symbol,
@@ -159,5 +171,6 @@ def run_analysis(symbol_details: dict, timeframe: str = "1h", htf_cache: dict = 
         retracements=retracements,
         current_price=current_price,
         current_price_time=current_price_time,
-        confidence=confidence
+        confidence=confidence,
+        kawaii_buy=kawaii_buy  # ✅ New flag for special reports
     )

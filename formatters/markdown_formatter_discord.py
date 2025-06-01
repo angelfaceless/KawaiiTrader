@@ -91,6 +91,14 @@ def format_report_discord(report) -> str:
     bias_range = f"**Bias:** {report.directional_bias} • **Range:** {report.range_low}-{report.range_high}"
 
     report_text = "━━━━━━━━━━━━━ 🌸🌸🌸 ━━━━━━━━━━━━━\n\n"
+
+    if getattr(report, "kawaii_buy", False):
+        report_text += (
+            "╭───────────────────────────────╮\n"
+            "         💖 KAWAII BUY 💖        \n"
+            "╰───────────────────────────────╯\n\n"
+        )
+
     report_text += header + "\n"
     if timestamp:
         report_text += timestamp + "\n"

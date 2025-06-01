@@ -122,7 +122,16 @@ def format_report_markdown(report, escape=True) -> str:
     range_text = f"{esc(report.range_low)}\\-{esc(report.range_high)}" if escape else f"{report.range_low}-{report.range_high}"
     bias_range = f"*Bias:* {esc(report.directional_bias)} • *Range:* {range_text}"
 
+    # 🌸 Header and Kawaii Box
     report_text = "━━━━━━━ 🌸🌸🌸 ━━━━━━━\n\n"
+
+    if getattr(report, "kawaii_buy", False):
+        report_text += (
+            "\\╭───────────────────────────────╮\n"
+            "         💖 KAWAII BUY 💖        \n"
+            "\\╰───────────────────────────────╯\n"
+        )
+
     report_text += header + "\n"
     if timestamp:
         report_text += timestamp + "\n"
@@ -134,7 +143,9 @@ def format_report_markdown(report, escape=True) -> str:
     report_text += format_htf_context(report) + "\n\n"
     report_text += "⚡️ *Manipulation* ⚡️\n" + manipulation_str + "\n\n"
     report_text += "*IRZ Levels* 🎯\n" + irz_content + "\n\n"
-    report_text += f"[🖼️ Chart]({esc(report.chart_path)})"
+
+    if hasattr(report, 'chart_path') and report.chart_path:
+        report_text += f"[🖼️ Chart]({esc(report.chart_path)})"
 
     return report_text.strip()
 

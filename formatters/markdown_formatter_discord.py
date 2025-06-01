@@ -1,10 +1,38 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+def confidence_icon(level: str) -> str:
+    return {
+        "strong": "🟢",
+        "medium": "🟡",
+        "weak": "⚪"
+    }.get(level, "⚪")
+
 def format_trendline_for_report(trendline_messages):
     if not trendline_messages:
         return "None detected"
-    return "\n".join(trendline_messages)
+    
+    formatted_messages = []
+    for message in trendline_messages:
+        lines = message.split('\n')
+        header = lines[0]
+        parts = header.split(' ', 1)
+        color_emoji = parts[0]
+        trendline_type = parts[1] if len(parts) > 1 else ""
+
+        position_full = ""
+        distance = ""
+
+        for line in lines[1:]:
+            if "Position:" in line:
+                position_full = line.split("Position:")[1].strip()
+            elif "Distance:" in line:
+                distance = line.split("Distance:")[1].strip()
+        
+        formatted_message = f"{color_emoji} **{trendline_type}** • {position_full} • {distance}"
+        formatted_messages.append(formatted_message)
+    
+    return "\n".join(formatted_messages)
 
 def format_htf_context(report):
     lines = ["📊 **HTF Context**"]
@@ -12,17 +40,17 @@ def format_htf_context(report):
     for lvl, meta in report.confidence.get("support", {}).items():
         if isinstance(meta, dict) and meta.get("level") != "weak":
             tfs = ", ".join(meta.get("matched_timeframes", []))
-            lines.append(f"• {lvl} (Support) — {meta['level']} alignment with {tfs}")
+            lines.append(f"• {lvl} (Support) — {confidence_icon(meta['level'])} aligned with {tfs}")
 
     for lvl, meta in report.confidence.get("resistance", {}).items():
         if isinstance(meta, dict) and meta.get("level") != "weak":
             tfs = ", ".join(meta.get("matched_timeframes", []))
-            lines.append(f"• {lvl} (Resistance) — {meta['level']} alignment with {tfs}")
+            lines.append(f"• {lvl} (Resistance) — {confidence_icon(meta['level'])} aligned with {tfs}")
 
     for role, meta in report.confidence.get("trendline", {}).items():
         if isinstance(meta, dict) and meta.get("level") != "weak":
             tfs = ", ".join(meta.get("matched_timeframes", []))
-            lines.append(f"• {role.capitalize()} trendline — {meta['level']} alignment with {tfs}")
+            lines.append(f"• {role.capitalize()} trendline — {confidence_icon(meta['level'])} aligned with {tfs}")
 
     return "\n".join(lines) if len(lines) > 1 else "📊 **HTF Context**\nNo HTF Context Detected"
 
@@ -53,50 +81,37 @@ def format_report_discord(report) -> str:
     elif hasattr(report, 'trendline_summary') and report.trendline_summary:
         trendline_content = report.trendline_summary if report.trendline_summary != "No active trendlines" else "None detected"
 
-    manipulation_str = "None detected"
     if hasattr(report, 'manipulations') and report.manipulations:
         manipulation_str = "\n".join(
             f"• {m.timestamp} — **{m.direction}** at {m.price}"
             for m in report.manipulations
         )
+    else:
+        manipulation_str = "None detected"
 
     irz_content = "None available"
     if hasattr(report, 'irz_message') and report.irz_message:
         irz_content = report.irz_message
-    else:
-        retrace_str = ""
-        if hasattr(report, 'retracements') and report.retracements:
-            retrace_str = "Retracement Zone:\n" + "\n".join(
-                f"🟠 {rt.label}: {rt.level}" for rt in report.retracements
-            )
-
-        target_str = ""
-        if hasattr(report, 'targets') and report.targets:
-            target_str = "Profit Targets:\n" + "\n".join(
-                f"🎯 {t.label}: {t.level}" for t in report.targets
-            )
-
-        irz_parts = []
-        if retrace_str:
-            irz_parts.append(retrace_str)
-        if target_str:
-            irz_parts.append(target_str)
-        if irz_parts:
-            irz_content = "🟪 IRZ Levels (projected):\n\n" + "\n\n".join(irz_parts)
-            if hasattr(report, 'invalidation_point') and report.invalidation_point:
-                irz_content += f"\n\n⚠️ Invalidation Point: {report.invalidation_point}"
 
     header = f"**{report.symbol}** • {report.timeframe} • {current_price_str}"
     timestamp = f"_{date_str} at {time_str}_" if time_str and date_str else ""
-    bias_range = f"**Bias:** {report.directional_bias} • **Range:** {report.range_low}-{report.range_high}"
+    range_text = f"{report.range_low}-{report.range_high}"
+    bias_range = f"**Bias:** {report.directional_bias} • **Range:** {range_text}"
 
-    report_text = "━━━━━━━━━━━━━ 🌸🌸🌸 ━━━━━━━━━━━━━\n\n"
+    report_text = "━━━━━━━ 🌸🌸🌸 ━━━━━━━\n\n"
 
     if getattr(report, "kawaii_buy", False):
         report_text += (
             "╭───────────────────────────────╮\n"
             "         💖 KAWAII BUY 💖        \n"
-            "╰───────────────────────────────╯\n\n"
+            "╰───────────────────────────────╯\n"
+        )
+
+    if getattr(report, "kawaii_sell", False):
+        report_text += (
+            "╭───────────────────────────────╮\n"
+            "        💔 KAWAII SELL 💔        \n"
+            "╰───────────────────────────────╯\n"
         )
 
     report_text += header + "\n"
@@ -104,8 +119,8 @@ def format_report_discord(report) -> str:
         report_text += timestamp + "\n"
     report_text += bias_range + "\n\n"
 
-    report_text += "🟢 **Support** \n" + "\n".join(support_groups) + "\n\n"
-    report_text += "🔴 **Resistance** \n" + "\n".join(resistance_groups) + "\n\n"
+    report_text += "🟢 **Support**\n" + "\n".join(support_groups) + "\n\n"
+    report_text += "🔴 **Resistance**\n" + "\n".join(resistance_groups) + "\n\n"
     report_text += "**Trendlines** 📈\n" + trendline_content + "\n\n"
     report_text += format_htf_context(report) + "\n\n"
     report_text += "⚡️ **Manipulation** ⚡️\n" + manipulation_str + "\n\n"

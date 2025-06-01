@@ -45,3 +45,7 @@ class Report:
 
     # 🌸 Kawaii Buy flag
     kawaii_buy: bool = False
+
+    # 💔 Kawaii Sell flag and resistance markers
+    kawaii_sell: bool = False
+    kawaii_sell_resistances: List[float] = field(default_factory=list)

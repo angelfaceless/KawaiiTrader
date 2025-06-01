@@ -20,6 +20,31 @@ def truncate_touch_points(message: str, max_points: int = 10) -> str:
     return f"{prefix}Touch points: {', '.join(truncated)}... (+{len(points) - max_points} more)"
 
 
+def check_kawaii_sell_criteria(range_high, manipulation, confidence, manipulations) -> tuple[bool, list]:
+    qualifying_resistances = []
+    resistance_conf = confidence.get("resistance", {})
+
+    for lvl_str, meta in resistance_conf.items():
+        if not isinstance(meta, dict):
+            continue
+        if meta.get("level") in {"strong", "medium"} and meta.get("matched_timeframes"):
+            try:
+                lvl = float(lvl_str)
+                if abs(lvl - range_high) <= 5:
+                    qualifying_resistances.append(lvl)
+            except ValueError:
+                continue
+
+    if not qualifying_resistances:
+        return False, []
+
+    for m in manipulations:
+        if m.direction == "up":
+            return True, qualifying_resistances
+
+    return False, []
+
+
 def run_analysis(symbol_details: dict, timeframe: str = "1h", htf_cache: dict = None) -> Report:
     input_symbol = symbol_details.get("input_symbol", symbol_details.get("db_symbol", "Unknown"))
     target_candles = 365 if timeframe == "1d" else 120
@@ -142,6 +167,14 @@ def run_analysis(symbol_details: dict, timeframe: str = "1h", htf_cache: dict = 
         manipulation.get("direction") == "down"
     )
 
+    # 💔 Kawaii Sell condition
+    kawaii_sell, kawaii_sell_resistances = check_kawaii_sell_criteria(
+        range_high=range_high,
+        manipulation=manipulation,
+        confidence=confidence,
+        manipulations=manipulations
+    )
+
     chart_path = plot_full_analysis(
         df=df,
         symbol=input_symbol,
@@ -172,5 +205,7 @@ def run_analysis(symbol_details: dict, timeframe: str = "1h", htf_cache: dict = 
         current_price=current_price,
         current_price_time=current_price_time,
         confidence=confidence,
-        kawaii_buy=kawaii_buy  # ✅ New flag for special reports
+        kawaii_buy=kawaii_buy,
+        kawaii_sell=kawaii_sell,
+        kawaii_sell_resistances=kawaii_sell_resistances
     )

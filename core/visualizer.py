@@ -18,13 +18,46 @@ warmup_matplotlib()
 
 render_lock = asyncio.Lock()
 
-async def safe_plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels, trendlines, fib_data, range_data):
+async def safe_plot_full_analysis(
+    df,
+    symbol,
+    timeframe,
+    support_levels,
+    resistance_levels,
+    trendlines,
+    fib_data,
+    range_data,
+    kawaii_sell=False,
+    kawaii_sell_resistances=None,
+):
     async with render_lock:
-        chart_path = plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels, trendlines, fib_data, range_data)
+        chart_path = plot_full_analysis(
+            df,
+            symbol,
+            timeframe,
+            support_levels,
+            resistance_levels,
+            trendlines,
+            fib_data,
+            range_data,
+            kawaii_sell=kawaii_sell,
+            kawaii_sell_resistances=kawaii_sell_resistances,
+        )
         await asyncio.sleep(0.1)
         return chart_path
 
-def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels, trendlines, fib_data, range_data):
+def plot_full_analysis(
+    df,
+    symbol,
+    timeframe,
+    support_levels,
+    resistance_levels,
+    trendlines,
+    fib_data,
+    range_data,
+    kawaii_sell=False,
+    kawaii_sell_resistances=None,
+):
     static_timeframes = {"1min", "5min", "15min", "1h", "4h", "1d", "1w", "1mo", "1month"}
 
     if timeframe == "1min":
@@ -45,13 +78,16 @@ def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels,
         df_display = df.copy().tail(300); width = 0.6; x_pad = 5
 
     y_zoom = timeframe in static_timeframes
-    if len(df_display) < 5: return None
+    if len(df_display) < 5:
+        return None
 
     est_time_available = False
     df_display_est_index = df_display.index
     if not isinstance(df_display.index, pd.DatetimeIndex):
-        try: df_display.index = pd.to_datetime(df_display.index)
-        except: pass
+        try:
+            df_display.index = pd.to_datetime(df_display.index)
+        except:
+            pass
     if isinstance(df_display.index, pd.DatetimeIndex):
         try:
             if df_display.index.tz is None:
@@ -96,6 +132,23 @@ def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels,
             bbox=dict(boxstyle="round,pad=0.2", facecolor="#d8bfe6", edgecolor="none", alpha=0.9)
         )
 
+    # 💔 Kawaii Sell resistances in pink
+    if kawaii_sell and kawaii_sell_resistances:
+        for level in kawaii_sell_resistances:
+            ax.axhline(y=level, color="#ff69b4", linestyle="-", linewidth=1.8, zorder=2.15)
+            ax.annotate(
+                f"{level:.2f}",
+                xy=(len(df_display) - 1 + x_pad, level),
+                xytext=(6, 0),
+                textcoords="offset points",
+                fontsize=10,
+                color="black",
+                va="center",
+                ha="left",
+                zorder=2.2,
+                bbox=dict(boxstyle="round,pad=0.2", facecolor="#d8bfe6", edgecolor="none", alpha=0.9)
+            )
+
     original_index_offset = len(df) - len(df_display)
     for trend in trendlines.values():
         slope, intercept = trend["slope"], trend["intercept"]
@@ -132,8 +185,10 @@ def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels,
         price_bounds = [df_display["low"].min(), df_display["high"].max()]
         if fib_data:
             price_bounds += fib_data.get("target_levels", []) + fib_data.get("irz_levels", [])
-            if "full_levels" in fib_data: price_bounds += list(fib_data["full_levels"].values())
-            if "anchor" in fib_data: price_bounds.append(fib_data["anchor"])
+            if "full_levels" in fib_data:
+                price_bounds += list(fib_data["full_levels"].values())
+            if "anchor" in fib_data:
+                price_bounds.append(fib_data["anchor"])
         low, high = min(price_bounds), max(price_bounds)
         margin_factor = (
             0.005 if timeframe == "1min" else
@@ -151,19 +206,23 @@ def plot_full_analysis(df, symbol, timeframe, support_levels, resistance_levels,
     if est_time_available:
         if timeframe in {"1min", "5min", "15min", "1h"}:
             special_times = [datetime.time(9, 30), datetime.time(10, 30), datetime.time(13, 30), datetime.time(15, 30)]
-            tick_pos = [i for i, ts in enumerate(df_display_est_index) if isinstance(ts, datetime.datetime) and ts.time() in special_times]
+            tick_pos = [i for i, ts in enumerate(df_display_est_index)
+                        if isinstance(ts, datetime.datetime) and ts.time() in special_times]
             tick_labels = [df_display_est_index[i].strftime("%H:%M") for i in tick_pos if i < len(df_display_est_index)]
             ax.set_xticks(tick_pos)
             ax.set_xticklabels(tick_labels, rotation=45, ha="right", fontsize=10)
         else:
             ax.xaxis.set_major_locator(plt.MaxNLocator(nbins=7, integer=True))
             ax.xaxis.set_major_formatter(plt.FuncFormatter(
-                lambda x, _: df_display_est_index[int(x)].strftime("%m-%d") if 0 <= int(x) < len(df_display_est_index) and isinstance(df_display_est_index[int(x)], datetime.datetime) else ""
+                lambda x, _: df_display_est_index[int(x)].strftime("%m-%d")
+                if 0 <= int(x) < len(df_display_est_index) and isinstance(df_display_est_index[int(x)], datetime.datetime)
+                else ""
             ))
             plt.xticks(rotation=45, ha="right", fontsize=10)
         ax.set_xlabel("Time (EST)", fontsize=12)
     else:
-        ax.set_xticks([]); ax.set_xlabel("Candles", fontsize=12)
+        ax.set_xticks([])
+        ax.set_xlabel("Candles", fontsize=12)
 
     os.makedirs("Charts", exist_ok=True)
     chart_path = os.path.join("Charts", f"chart_{symbol}_{timeframe}.png")

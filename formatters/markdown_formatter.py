@@ -132,6 +132,13 @@ def format_report_markdown(report, escape=True) -> str:
             "\\╰───────────────────────────────╯\n"
         )
 
+    if getattr(report, "kawaii_sell", False):
+        report_text += (
+            "\\╭───────────────────────────────╮\n"
+            "        💔 KAWAII SELL 💔        \n"
+            "\\╰───────────────────────────────╯\n"
+        )
+
     report_text += header + "\n"
     if timestamp:
         report_text += timestamp + "\n"

@@ -117,14 +117,15 @@ def plot_full_analysis(
             zorder=2
         ))
 
+    # ✅ Support lines (no prefix)
     for level in support_levels:
-        ax.axhline(y=level, color="#77dd77", linestyle="-", linewidth=1.2, zorder=2.1)
+        ax.axhline(y=level, color="#4caf50", linestyle="-", linewidth=2.0, zorder=2.1)
         ax.annotate(
             f"{level:.2f}",
             xy=(len(df_display) - 1 + x_pad, level),
             xytext=(6, 0),
             textcoords="offset points",
-            fontsize=10,
+            fontsize=11,
             color="black",
             va="center",
             ha="left",
@@ -132,7 +133,7 @@ def plot_full_analysis(
             bbox=dict(boxstyle="round,pad=0.2", facecolor="#d8bfe6", edgecolor="none", alpha=0.9)
         )
 
-    # 💔 Kawaii Sell resistances in pink
+    # ✅ Kawaii Sell resistance lines (no prefix)
     if kawaii_sell and kawaii_sell_resistances:
         for level in kawaii_sell_resistances:
             ax.axhline(y=level, color="#ff69b4", linestyle="-", linewidth=1.8, zorder=2.15)

@@ -121,16 +121,19 @@ def plot_full_analysis(
     label_x = len(df_display) - 1 + x_pad + fib_right_pad
     htf_confidence = range_data.get("htf_confidence", {})
 
-    # ✅ Support lines w/ HTF-aligned color borders
+    # ✅ Support lines w/ fuzzy HTF-aligned border lookup
     for level in support_levels:
-        str_level = f"{level:.2f}"
-        meta = htf_confidence.get("support", {}).get(str_level, {})
+        meta = next(
+            (meta for lvl_str, meta in htf_confidence.get("support", {}).items()
+             if abs(float(lvl_str) - level) < 0.01),
+            {}
+        )
         conf_level = meta.get("level")
         edge = {
-            "strong": "#4caf50",  # green
-            "medium": "#fbc02d",  # yellow
-            "weak": "#424242",    # dark grey
-        }.get(conf_level, "none")
+            "strong": "#4caf50",
+            "medium": "#fbc02d",
+            "weak": "#424242",
+        }.get(conf_level, "#999999")
 
         ax.axhline(y=level, color="#4caf50", linestyle="-", linewidth=2.0, zorder=2.1)
         ax.annotate(
@@ -146,17 +149,20 @@ def plot_full_analysis(
             bbox=dict(boxstyle="round,pad=0.2", facecolor="#d8bfe6", edgecolor=edge, linewidth=2, alpha=1.0)
         )
 
-    # ✅ Kawaii Sell resistance lines w/ HTF-aligned color borders
+    # ✅ Kawaii Sell resistance lines w/ fuzzy HTF-aligned border lookup
     if kawaii_sell and kawaii_sell_resistances:
         for level in kawaii_sell_resistances:
-            str_level = f"{level:.2f}"
-            meta = htf_confidence.get("resistance", {}).get(str_level, {})
+            meta = next(
+                (meta for lvl_str, meta in htf_confidence.get("resistance", {}).items()
+                 if abs(float(lvl_str) - level) < 0.01),
+                {}
+            )
             conf_level = meta.get("level")
             edge = {
                 "strong": "#4caf50",
                 "medium": "#fbc02d",
                 "weak": "#424242",
-            }.get(conf_level, "none")
+            }.get(conf_level, "#999999")
 
             ax.axhline(y=level, color="#ff69b4", linestyle="-", linewidth=1.8, zorder=2.15)
             ax.annotate(

@@ -159,7 +159,6 @@ def run_analysis(symbol_details: dict, timeframe: str = "1h", htf_cache: dict = 
         elif direction == "down":
             directional_bias = "bearish"
 
-    # 🌸 Kawaii Buy condition
     kawaii_buy = (
         range_info.get("is_range", False) and
         range_info.get("support_aligned", False) and
@@ -167,7 +166,6 @@ def run_analysis(symbol_details: dict, timeframe: str = "1h", htf_cache: dict = 
         manipulation.get("direction") == "down"
     )
 
-    # 💔 Kawaii Sell condition
     kawaii_sell, kawaii_sell_resistances = check_kawaii_sell_criteria(
         range_high=range_high,
         manipulation=manipulation,
@@ -175,6 +173,7 @@ def run_analysis(symbol_details: dict, timeframe: str = "1h", htf_cache: dict = 
         manipulations=manipulations
     )
 
+    # ✅ Pass HTF confidence info to chart
     chart_path = plot_full_analysis(
         df=df,
         symbol=input_symbol,
@@ -183,7 +182,9 @@ def run_analysis(symbol_details: dict, timeframe: str = "1h", htf_cache: dict = 
         resistance_levels=resistances,
         trendlines=trendline_vectors,
         fib_data=fib_data,
-        range_data=range_info
+        range_data={**range_info, "htf_confidence": confidence},  # ✅ Surgical fix
+        kawaii_sell=kawaii_sell,
+        kawaii_sell_resistances=kawaii_sell_resistances
     )
 
     return Report(
